@@ -11,10 +11,6 @@ def _format_dollars(amount: float) -> str:
     return f"${amount:.2f}"
 
 
-def _format_prus(value: int) -> str:
-    return f"{value}"
-
-
 def _format_reset(reset: datetime | None, now: datetime) -> str:
     if reset is None:
         return "next reset: unknown"
@@ -37,16 +33,25 @@ def _format_reset(reset: datetime | None, now: datetime) -> str:
 
 
 def render(spend: Spend, *, now: datetime) -> str:
-    overage_note = ", in overage" if spend.remaining < 0 else ""
-
     plan_label = f" ({spend.plan})" if spend.plan else ""
     login_label = spend.login or "<unknown account>"
 
     lines = [
         f"GitHub Copilot - {login_label}{plan_label}",
-        f"  Spent:     {_format_dollars(spend.dollars_spent)}  ({_format_prus(spend.consumed)} PRUs)",
-        f"  Allowance: {_format_dollars(spend.dollars_entitlement)}  ({_format_prus(spend.entitlement)} PRUs)",
-        f"  Remaining: {_format_dollars(spend.dollars_remaining)}  ({_format_prus(spend.remaining)} PRUs{overage_note})",
-        f"  Resets:    {_format_reset(spend.reset, now)}",
+        f"  Used:      {spend.consumed} PRUs",
+        f"  Allowance: {_format_dollars(spend.dollars_entitlement)}  ({spend.entitlement} PRUs included)",
     ]
+
+    if spend.billable_prus > 0:
+        lines.append(
+            f"  Billable:  {_format_dollars(spend.dollars_owed)}"
+            f"  ({spend.billable_prus} PRUs over allowance at $0.04/PRU)"
+        )
+    else:
+        lines.append(
+            f"  Remaining: {_format_dollars(spend.dollars_free_remaining)}"
+            f"  ({spend.free_remaining_prus} PRUs of free allowance left)"
+        )
+
+    lines.append(f"  Resets:    {_format_reset(spend.reset, now)}")
     return "\n".join(lines)

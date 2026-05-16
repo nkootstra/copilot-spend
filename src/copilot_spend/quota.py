@@ -39,12 +39,13 @@ class NoSubscriptionError(Exception):
 class Spend:
     login: str
     plan: str
-    entitlement: int
-    remaining: int
-    consumed: int
-    dollars_spent: float
-    dollars_remaining: float
-    dollars_entitlement: float
+    entitlement: int               # included free PRUs per period
+    consumed: int                  # total PRUs used this period (>= 0)
+    billable_prus: int             # max(0, consumed - entitlement)
+    free_remaining_prus: int       # max(0, entitlement - consumed)
+    dollars_owed: float            # billable_prus * PRU_PRICE_USD
+    dollars_entitlement: float     # entitlement * PRU_PRICE_USD (reference)
+    dollars_free_remaining: float  # free_remaining_prus * PRU_PRICE_USD
     reset: datetime | None
 
 
@@ -100,10 +101,19 @@ def parse_quota(payload: dict) -> Spend:
             f"premium_interactions missing entitlement/remaining: {exc}"
         ) from None
 
-    consumed = entitlement - remaining
-    dollars_spent = round(consumed * PRU_PRICE_USD, 2)
-    dollars_remaining = round(remaining * PRU_PRICE_USD, 2)
+    # API semantics observed against a business-plan account:
+    #   `remaining` counts down from 0 as you consume PRUs (so the value is
+    #   ≤ 0 in steady state on this plan class). `entitlement` is the free
+    #   credit per period — the first N PRUs are not billable.
+    # Defensive: if `remaining` is positive (unobserved case, possibly other
+    # plan classes), treat it as zero consumption rather than guessing.
+    consumed = max(0, -remaining)
+    billable_prus = max(0, consumed - entitlement)
+    free_remaining_prus = max(0, entitlement - consumed)
+
+    dollars_owed = round(billable_prus * PRU_PRICE_USD, 2)
     dollars_entitlement = round(entitlement * PRU_PRICE_USD, 2)
+    dollars_free_remaining = round(free_remaining_prus * PRU_PRICE_USD, 2)
 
     reset = _extract_reset(payload, pi)
 
@@ -117,11 +127,12 @@ def parse_quota(payload: dict) -> Spend:
         login=login,
         plan=plan,
         entitlement=entitlement,
-        remaining=remaining,
         consumed=consumed,
-        dollars_spent=dollars_spent,
-        dollars_remaining=dollars_remaining,
+        billable_prus=billable_prus,
+        free_remaining_prus=free_remaining_prus,
+        dollars_owed=dollars_owed,
         dollars_entitlement=dollars_entitlement,
+        dollars_free_remaining=dollars_free_remaining,
         reset=reset,
     )
 
