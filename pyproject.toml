@@ -1,0 +1,40 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "copilot-spend"
+version = "0.1.0"
+description = "Print your current-period GitHub Copilot spend and reset date."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [
+    { name = "Niels Kootstra", email = "niels.kootstra@gmail.com" },
+]
+keywords = ["github", "copilot", "spend", "quota", "cli"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development",
+    "Topic :: Utilities",
+]
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+
+[project.scripts]
+copilot-spend = "copilot_spend.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/copilot_spend"]
