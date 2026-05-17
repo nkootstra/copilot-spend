@@ -8,6 +8,42 @@ Works against both `github.com` and GitHub Enterprise hosts.
 
 ## How it works
 
+```mermaid
+flowchart TD
+    Start([copilot-spend ...]) --> Cmd{subcommand?}
+
+    Cmd -- login --> Host[prompt: github.com or GHE host]
+    Host --> DeviceCode[POST /login/device/code]
+    DeviceCode --> ShowCode[show user code + verification URL]
+    ShowCode --> Poll[poll /login/oauth/access_token]
+    Poll -- access_denied / expired --> LoginFail[/exit 1: login failed/]
+    Poll -- ghu_ token --> Verify[verify via session-token exchange]
+    Verify -- fail --> LoginFail
+    Verify -- ok --> WriteAuth[write auth.json + session.json 0o600]
+    WriteAuth --> LoginDone[/exit 0/]
+
+    Cmd -- logout --> DeleteFiles[delete auth.json + session.json]
+    DeleteFiles --> LogoutDone[/exit 0/]
+
+    Cmd -- bare --> Native{native<br/>~/.config/copilot-spend/auth.json?}
+    Native -- yes --> Cache{session.json<br/>still valid?}
+    Cache -- yes --> SessBearer[bearer = cached session token]
+    Cache -- no --> Exchange[exchange ghu_ for session token]
+    Exchange --> CacheWrite[write session.json 0o600]
+    CacheWrite --> SessBearer
+    Native -- no --> Opencode{opencode<br/>~/.local/share/opencode/auth.json?}
+    Opencode -- yes --> RawBearer[bearer = raw gho_ token<br/>session exchange skipped]
+    Opencode -- no --> NoCreds[/exit 2: run copilot-spend login/]
+    SessBearer --> Quota[GET /copilot_internal/user with Bearer]
+    RawBearer --> Quota
+    Quota -- 200 --> Print[/print spend + reset date<br/>exit 0/]
+    Quota -- 401 / 403 --> AuthErr[/exit 2: re-authenticate/]
+    Quota -- 404 --> NoSub[/exit 4: no Copilot quota/]
+    Quota -- 5xx / timeout --> ApiErr[/exit 3: API error/]
+```
+
+The bare `copilot-spend` invocation, expanded as numbered steps:
+
 1. Resolves a GitHub Copilot token from the first source that exists, in
    this order:
    1. Native: `~/.config/copilot-spend/auth.json`, created by running
