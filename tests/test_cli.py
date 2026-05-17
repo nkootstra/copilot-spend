@@ -3,6 +3,9 @@ from __future__ import annotations
 import pytest
 
 import copilot_spend.cli as cli_module
+from copilot_spend.api import APIError
+from copilot_spend.auth import Auth, AuthError
+from copilot_spend.quota import NoSubscriptionError
 
 
 def test_module_imports():
@@ -62,6 +65,87 @@ def test_unknown_subcommand_exits_nonzero(capsys):
         cli_module.main(["nope"])
 
     assert exc.value.code != 0
+
+
+def test_whoami_subcommand_dispatches(monkeypatch):
+    called = {}
+
+    def fake_whoami():
+        called["whoami"] = True
+        return 0
+
+    monkeypatch.setattr(cli_module, "_run_whoami", fake_whoami)
+
+    rc = cli_module.main(["whoami"])
+
+    assert rc == 0
+    assert called == {"whoami": True}
+
+
+def test_whoami_prints_login_host_source_and_plan(monkeypatch, capsys):
+    auth = Auth(token="t", host="github.com", source="native")
+    monkeypatch.setattr(cli_module, "resolve_auth", lambda: auth)
+    monkeypatch.setattr(
+        cli_module,
+        "fetch_quota",
+        lambda a: {"login": "alice", "copilot_plan": "business"},
+    )
+
+    rc = cli_module.main(["whoami"])
+
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "login:" in out and "alice" in out
+    assert "host:" in out and "github.com" in out
+    assert "source:" in out and "native" in out
+    assert "plan:" in out and "business" in out
+
+
+def test_whoami_prints_identity_even_without_subscription(monkeypatch, capsys):
+    auth = Auth(token="t", host="ghe.example.com", source="opencode")
+    monkeypatch.setattr(cli_module, "resolve_auth", lambda: auth)
+
+    def no_sub(_a):
+        raise NoSubscriptionError("no quota")
+
+    monkeypatch.setattr(cli_module, "fetch_quota", no_sub)
+
+    rc = cli_module.main(["whoami"])
+
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "ghe.example.com" in out
+    assert "opencode" in out
+    assert "no Copilot quota" in out
+
+
+def test_whoami_auth_error_exits_2(monkeypatch, capsys):
+    def boom():
+        raise AuthError("no creds")
+
+    monkeypatch.setattr(cli_module, "resolve_auth", boom)
+
+    rc = cli_module.main(["whoami"])
+
+    assert rc == 2
+    err = capsys.readouterr().err
+    assert "no creds" in err
+
+
+def test_whoami_api_error_exits_3_and_scrubs_token(monkeypatch, capsys):
+    auth = Auth(token="hunter2-token", host="github.com", source="native")
+    monkeypatch.setattr(cli_module, "resolve_auth", lambda: auth)
+
+    def api_boom(_a):
+        raise APIError("upstream said hunter2-token is bad")
+
+    monkeypatch.setattr(cli_module, "fetch_quota", api_boom)
+
+    rc = cli_module.main(["whoami"])
+
+    assert rc == 3
+    err = capsys.readouterr().err
+    assert "hunter2-token" not in err
 
 
 def test_bare_invocation_runs_show_quota(monkeypatch):

@@ -39,6 +39,10 @@ def _build_parser() -> argparse.ArgumentParser:
         "logout",
         help="Remove copilot-spend's stored credentials.",
     )
+    subparsers.add_parser(
+        "whoami",
+        help="Print the current login, host, credential source, and Copilot plan.",
+    )
     return parser
 
 
@@ -77,6 +81,43 @@ def _run_show_quota() -> int:
     return 0
 
 
+def _run_whoami() -> int:
+    try:
+        auth = resolve_auth()
+    except AuthError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+
+    login = ""
+    plan = ""
+    try:
+        payload = fetch_quota(auth)
+    except NoSubscriptionError:
+        # Identity is still meaningful without a quota — print what we have.
+        payload = None
+    except APIError as exc:
+        print(scrub(str(exc), auth.token), file=sys.stderr)
+        return 3
+
+    if isinstance(payload, dict):
+        login = str(payload.get("login") or "")
+        plan = str(payload.get("copilot_plan") or "")
+
+    lines = [
+        f"host:   {auth.host}",
+        f"source: {auth.source}",
+    ]
+    if login:
+        lines.insert(0, f"login:  {login}")
+    if plan:
+        lines.append(f"plan:   {plan}")
+    elif payload is None:
+        lines.append("plan:   (no Copilot quota on this account)")
+
+    print("\n".join(lines))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
@@ -89,6 +130,8 @@ def main(argv: list[str] | None = None) -> int:
         from copilot_spend.login import run_logout
 
         return run_logout()
+    if args.command == "whoami":
+        return _run_whoami()
 
     return _run_show_quota()
 
