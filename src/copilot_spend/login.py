@@ -49,6 +49,37 @@ def _post_json(url: str, body: dict[str, Any], *, timeout: float = 10.0) -> dict
     return cast(dict[str, Any], parsed)
 
 
+def _http_error_detail(exc: urllib.error.HTTPError, limit: int = 300) -> str:
+    """Extract a human-readable error description from an HTTPError body.
+
+    GitHub device-flow endpoints return `{"error": "...", "error_description": "..."}`
+    even on 4xx — surfacing that body turns a bare "GitHub returned 422" into a
+    diagnosable message.
+    """
+    try:
+        raw = exc.read()
+    except Exception:
+        return ""
+    if not raw:
+        return ""
+    try:
+        parsed = json.loads(raw.decode("utf-8", errors="replace"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        text = raw.decode("utf-8", errors="replace").strip()
+        return text[:limit] + ("…" if len(text) > limit else "")
+    if isinstance(parsed, dict):
+        err = parsed.get("error")
+        desc = parsed.get("error_description")
+        if err and desc:
+            return f"{err}: {desc}"
+        if err:
+            return str(err)
+        if desc:
+            return str(desc)
+    text = json.dumps(parsed)
+    return text[:limit] + ("…" if len(text) > limit else "")
+
+
 def _prompt_host(stdin: IO[str] | None = None, stderr: IO[str] | None = None) -> str:
     stdin = stdin or sys.stdin
     stderr = stderr or sys.stderr
@@ -78,9 +109,9 @@ def _request_device_code(host: str) -> dict[str, Any]:
     try:
         payload = _post_json(url, {"client_id": CLIENT_ID, "scope": OAUTH_SCOPE})
     except urllib.error.HTTPError as exc:
-        raise AuthError(
-            f"GitHub returned {exc.code} from {url}. Check the host and try again."
-        ) from None
+        detail = _http_error_detail(exc)
+        suffix = f": {detail}" if detail else ". Check the host and try again."
+        raise AuthError(f"GitHub returned {exc.code} from {url}{suffix}") from None
     except TimeoutError:
         raise AuthError(f"Timed out reaching {host} for device-code request.") from None
     except urllib.error.URLError as exc:
@@ -127,9 +158,9 @@ def _poll_for_token(
         try:
             payload = _post_json(url, body)
         except urllib.error.HTTPError as exc:
-            raise AuthError(
-                f"GitHub returned {exc.code} during token polling. Run `copilot-spend login` again."
-            ) from None
+            detail = _http_error_detail(exc)
+            suffix = f": {detail}" if detail else ". Run `copilot-spend login` again."
+            raise AuthError(f"GitHub returned {exc.code} during token polling{suffix}") from None
         except TimeoutError:
             # Transient — keep polling within the time budget.
             continue

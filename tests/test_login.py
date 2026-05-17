@@ -385,6 +385,75 @@ def test_run_login_rejects_ssrf_target(monkeypatch, capsys):
     assert not paths.auth_path().exists()
 
 
+def _http_error(status: int, body: bytes = b"") -> urllib.error.HTTPError:
+    return urllib.error.HTTPError(
+        url="https://github.test/x",
+        code=status,
+        msg="error",
+        hdrs=None,
+        fp=io.BytesIO(body),
+    )
+
+
+def test_run_login_device_code_http_error_surfaces_json_error_description(monkeypatch, capsys):
+    body = json.dumps(
+        {"error": "invalid_request", "error_description": "client_id is missing"}
+    ).encode("utf-8")
+    fake, _ = _post_json_sequence(_http_error(422, body))
+    monkeypatch.setattr(login, "_post_json", fake)
+
+    rc = login.run_login(
+        stdin=_stdin("1\n"),
+        sleep=lambda _s: None,
+        now=lambda: 0.0,
+    )
+
+    assert rc == 2
+    err = capsys.readouterr().err
+    assert "422" in err
+    assert "invalid_request" in err
+    assert "client_id is missing" in err
+
+
+def test_run_login_device_code_http_error_with_non_json_body_includes_excerpt(monkeypatch, capsys):
+    fake, _ = _post_json_sequence(_http_error(503, b"upstream unavailable"))
+    monkeypatch.setattr(login, "_post_json", fake)
+
+    rc = login.run_login(
+        stdin=_stdin("1\n"),
+        sleep=lambda _s: None,
+        now=lambda: 0.0,
+    )
+
+    assert rc == 2
+    err = capsys.readouterr().err
+    assert "503" in err
+    assert "upstream unavailable" in err
+
+
+def test_run_login_polling_http_error_surfaces_json_error_description(monkeypatch, capsys):
+    body = json.dumps(
+        {"error": "incorrect_client_credentials", "error_description": "client_secret invalid"}
+    ).encode("utf-8")
+    fake, _ = _post_json_sequence(
+        _device_response(),
+        _http_error(401, body),
+    )
+    monkeypatch.setattr(login, "_post_json", fake)
+
+    rc = login.run_login(
+        stdin=_stdin("1\n"),
+        sleep=lambda _s: None,
+        now=lambda: 0.0,
+    )
+
+    assert rc == 2
+    err = capsys.readouterr().err
+    assert "401" in err
+    assert "incorrect_client_credentials" in err
+    assert "client_secret invalid" in err
+
+
 def test_run_logout_removes_auth_and_legacy_session(capsys):
     paths.write_secret_file(paths.auth_path(), {"k": "v"})
     legacy = paths.config_dir() / "session.json"
