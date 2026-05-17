@@ -8,7 +8,7 @@ from importlib.metadata import PackageNotFoundError, version
 
 from copilot_spend.api import APIError, fetch_quota
 from copilot_spend.auth import AuthError, resolve_auth
-from copilot_spend.output import render
+from copilot_spend.output import render, render_json
 from copilot_spend.paths import scrub
 from copilot_spend.quota import NoSubscriptionError, parse_quota
 
@@ -30,6 +30,11 @@ def _build_parser() -> argparse.ArgumentParser:
         action="version",
         version=f"copilot-spend {_package_version()}",
     )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Print the current spend as JSON (stable schema).",
+    )
     subparsers = parser.add_subparsers(dest="command")
     subparsers.add_parser(
         "login",
@@ -46,7 +51,7 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _run_show_quota() -> int:
+def _run_show_quota(*, as_json: bool = False) -> int:
     auth = None
     try:
         auth = resolve_auth()
@@ -70,7 +75,10 @@ def _run_show_quota() -> int:
         return 4
 
     try:
-        print(render(spend, now=datetime.now(timezone.utc)))
+        if as_json:
+            print(render_json(spend))
+        else:
+            print(render(spend, now=datetime.now(timezone.utc)))
     except Exception as exc:
         print(
             scrub(f"unexpected error rendering output: {exc}", auth.token if auth else None),
@@ -133,7 +141,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "whoami":
         return _run_whoami()
 
-    return _run_show_quota()
+    return _run_show_quota(as_json=bool(args.json))
 
 
 def _entrypoint() -> None:

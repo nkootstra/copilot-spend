@@ -151,8 +151,9 @@ def test_whoami_api_error_exits_3_and_scrubs_token(monkeypatch, capsys):
 def test_bare_invocation_runs_show_quota(monkeypatch):
     called = {}
 
-    def fake_show():
+    def fake_show(*, as_json=False):
         called["show"] = True
+        called["as_json"] = as_json
         return 0
 
     monkeypatch.setattr(cli_module, "_run_show_quota", fake_show)
@@ -160,7 +161,53 @@ def test_bare_invocation_runs_show_quota(monkeypatch):
     rc = cli_module.main([])
 
     assert rc == 0
-    assert called == {"show": True}
+    assert called == {"show": True, "as_json": False}
+
+
+def test_json_flag_passes_through_to_show_quota(monkeypatch):
+    called = {}
+
+    def fake_show(*, as_json=False):
+        called["as_json"] = as_json
+        return 0
+
+    monkeypatch.setattr(cli_module, "_run_show_quota", fake_show)
+
+    rc = cli_module.main(["--json"])
+
+    assert rc == 0
+    assert called["as_json"] is True
+
+
+def test_json_flag_emits_parseable_json(monkeypatch, capsys):
+    import json
+
+    from copilot_spend.quota import Spend
+
+    auth = Auth(token="t", host="github.com", source="native")
+    monkeypatch.setattr(cli_module, "resolve_auth", lambda: auth)
+    monkeypatch.setattr(cli_module, "fetch_quota", lambda a: {})
+    fake_spend = Spend(
+        login="alice",
+        plan="business",
+        entitlement=300,
+        consumed=100,
+        billable_prus=0,
+        free_remaining_prus=200,
+        dollars_owed=0.0,
+        dollars_entitlement=12.0,
+        dollars_free_remaining=8.0,
+        reset=None,
+    )
+    monkeypatch.setattr(cli_module, "parse_quota", lambda _payload: fake_spend)
+
+    rc = cli_module.main(["--json"])
+
+    assert rc == 0
+    out = capsys.readouterr().out
+    parsed = json.loads(out)
+    assert parsed["login"] == "alice"
+    assert parsed["consumed_prus"] == 100
 
 
 def test_entrypoint_catches_unexpected_exception(monkeypatch, capsys):

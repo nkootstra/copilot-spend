@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime, timedelta, timezone
 
-from copilot_spend.output import render
+from copilot_spend.output import render, render_json
 from copilot_spend.quota import PRU_PRICE_USD, Spend
 
 
@@ -144,3 +145,42 @@ def test_missing_plan_renders_no_plan_suffix():
 
     assert "GitHub Copilot - test-user" in out
     assert "()" not in out  # no empty parens for missing plan
+
+
+def test_render_json_returns_valid_parseable_json():
+    out = render_json(_spend(consumed=221, reset=datetime(2026, 5, 31, tzinfo=timezone.utc)))
+
+    parsed = json.loads(out)
+    assert isinstance(parsed, dict)
+
+
+def test_render_json_includes_all_documented_fields():
+    reset = datetime(2026, 5, 31, tzinfo=timezone.utc)
+    parsed = json.loads(render_json(_spend(consumed=4073, reset=reset)))
+
+    assert parsed["login"] == "test-user"
+    assert parsed["plan"] == "business"
+    assert parsed["entitlement_prus"] == 300
+    assert parsed["consumed_prus"] == 4073
+    assert parsed["billable_prus"] == 3773
+    assert parsed["free_remaining_prus"] == 0
+    assert parsed["dollars_owed"] == 150.92
+    assert parsed["dollars_entitlement"] == 12.00
+    assert parsed["dollars_free_remaining"] == 0.00
+    assert parsed["pru_price_usd"] == PRU_PRICE_USD
+    assert parsed["reset"] == "2026-05-31T00:00:00+00:00"
+
+
+def test_render_json_reset_none_serializes_as_null():
+    parsed = json.loads(render_json(_spend(consumed=100, reset=None)))
+
+    assert parsed["reset"] is None
+
+
+def test_render_json_keys_sorted_for_stable_diffs():
+    out = render_json(_spend(consumed=100, reset=None))
+    parsed = json.loads(out)
+
+    # sort_keys=True means key order is deterministic — important for
+    # diff-friendly output piped into version control or jq.
+    assert list(parsed.keys()) == sorted(parsed.keys())

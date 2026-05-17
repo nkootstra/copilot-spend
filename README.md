@@ -106,6 +106,8 @@ uvx --from . copilot-spend
 
 ```sh
 copilot-spend          # print current-period quota
+copilot-spend --json   # same data as JSON (stable schema, jq-friendly)
+copilot-spend whoami   # print active login, host, source, and plan
 copilot-spend login    # authenticate via GitHub OAuth device flow
 copilot-spend logout   # remove copilot-spend's stored credentials
 ```
@@ -138,7 +140,33 @@ GitHub Copilot - your-login (business)
   Resets:    Jun 01, 2026 (in 16 days)
 ```
 
-Flags: `--help`, `--version`. Subcommands: `login`, `logout`.
+Flags: `--help`, `--version`, `--json`. Subcommands: `login`, `logout`, `whoami`.
+
+JSON output (stable schema, `null` fields included):
+
+```json
+{
+  "billable_prus": 3773,
+  "consumed_prus": 4073,
+  "dollars_entitlement": 12.0,
+  "dollars_free_remaining": 0.0,
+  "dollars_owed": 150.92,
+  "entitlement_prus": 300,
+  "free_remaining_prus": 0,
+  "login": "your-login",
+  "plan": "business",
+  "pru_price_usd": 0.04,
+  "reset": "2026-06-01T00:00:00+00:00"
+}
+```
+
+### Environment variables
+
+| Variable | Effect |
+|----------|--------|
+| `COPILOT_SPEND_QUIET=1` | Silence the permissive-perms warning when the auth file isn't `0o600`. |
+| `COPILOT_SPEND_DEBUG=1` | Re-raise unexpected exceptions with a full traceback; also emits a one-line diagnostic if the reset-date field can't be extracted. |
+| `COPILOT_SPEND_CONFIG_DIR` | Override the config directory (default: `$XDG_CONFIG_HOME/copilot-spend` or `~/.config/copilot-spend`). |
 
 ## Exit codes
 
