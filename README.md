@@ -74,19 +74,31 @@ request per run.
 
 ## Install
 
-PyPI publication is pending. Until then, install from a local clone:
+```sh
+# Option A: pipx (persistent, isolated)
+pipx install copilot-spend
+
+# Option B: pip (into your active environment or --user)
+pip install copilot-spend
+
+# Option C: uv tool (persistent, isolated)
+uv tool install copilot-spend
+
+# Option D: one-off run, no install
+uvx copilot-spend
+pipx run copilot-spend
+```
+
+### Install from source
 
 ```sh
 git clone https://github.com/nkootstra/copilot-spend.git
 cd copilot-spend
 
-# Option A: pipx
 pipx install .
-
-# Option B: uv (persistent install)
+# or:
 uv tool install --from . copilot-spend
-
-# Option C: uv (one-off run, no install)
+# or one-off:
 uvx --from . copilot-spend
 ```
 
