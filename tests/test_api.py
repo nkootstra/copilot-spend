@@ -244,6 +244,63 @@ def test_socket_timeout_mentions_duration():
     assert "timed out" in str(exc.value).lower() or "7.5" in str(exc.value)
 
 
+def test_500_retries_once_then_succeeds():
+    auth = Auth(token="t", host="ghe.example.com")
+    sleeps: list[float] = []
+
+    with patch("copilot_spend.api.urllib.request.urlopen") as urlopen:
+        urlopen.side_effect = [
+            _http_error(503),
+            _make_response({"login": "u"}),
+        ]
+        result = fetch_quota(auth, sleep=lambda s: sleeps.append(s))
+
+    assert result == {"login": "u"}
+    assert urlopen.call_count == 2
+    assert sleeps == [0.5]
+
+
+def test_500_retries_once_then_fails_includes_status():
+    auth = Auth(token="t", host="ghe.example.com")
+    sleeps: list[float] = []
+
+    with patch("copilot_spend.api.urllib.request.urlopen") as urlopen:
+        urlopen.side_effect = [_http_error(503), _http_error(502)]
+        with pytest.raises(APIError) as exc:
+            fetch_quota(auth, sleep=lambda s: sleeps.append(s))
+
+    assert urlopen.call_count == 2
+    assert sleeps == [0.5]
+    # Second failure surfaces — 502, not 503.
+    assert "502" in str(exc.value)
+
+
+def test_404_not_retried():
+    auth = Auth(token="t", host="ghe.example.com")
+    sleeps: list[float] = []
+
+    with patch("copilot_spend.api.urllib.request.urlopen") as urlopen:
+        urlopen.side_effect = _http_error(404)
+        with pytest.raises(NoSubscriptionError):
+            fetch_quota(auth, sleep=lambda s: sleeps.append(s))
+
+    assert urlopen.call_count == 1
+    assert sleeps == []
+
+
+def test_401_not_retried():
+    auth = Auth(token="t", host="ghe.example.com")
+    sleeps: list[float] = []
+
+    with patch("copilot_spend.api.urllib.request.urlopen") as urlopen:
+        urlopen.side_effect = _http_error(401)
+        with pytest.raises(APIError):
+            fetch_quota(auth, sleep=lambda s: sleeps.append(s))
+
+    assert urlopen.call_count == 1
+    assert sleeps == []
+
+
 def test_error_messages_do_not_contain_bearer_token():
     auth = Auth(token="hunter2-secret-token", host="ghe.example.com")
     body = b'{"token":"hunter2-secret-token","status":"error"}'

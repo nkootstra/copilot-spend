@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import json
 import ssl
+import time
 import urllib.error
 import urllib.request
+from collections.abc import Callable
 from importlib.metadata import PackageNotFoundError, version
 from typing import Any, cast
 
@@ -14,6 +16,13 @@ from copilot_spend.quota import NoSubscriptionError
 
 class APIError(Exception):
     pass
+
+
+# A single retry covers the common transient-5xx case (load-balancer hiccup,
+# brief overload) without compounding latency or hammering an already-sick
+# upstream. 0.5s gives the backend time to recover without making the user
+# feel the tool froze.
+_RETRY_BACKOFF_S = 0.5
 
 
 def _package_version() -> str:
@@ -49,7 +58,12 @@ def _reauth_message(source: str) -> str:
     )
 
 
-def fetch_quota(auth: Auth, *, timeout: float = 10.0) -> dict[str, Any]:
+def fetch_quota(
+    auth: Auth,
+    *,
+    timeout: float = 10.0,
+    sleep: Callable[[float], None] = time.sleep,
+) -> dict[str, Any]:
     # `/copilot_internal/user` accepts the OAuth/GitHub-App user token
     # directly as Bearer for both `ghu_` (native) and `gho_` (opencode).
     # No session-token exchange — that token (`/copilot_internal/v2/token`)
@@ -67,29 +81,35 @@ def fetch_quota(auth: Auth, *, timeout: float = 10.0) -> dict[str, Any]:
 
     context = ssl.create_default_context()
 
-    try:
-        with urllib.request.urlopen(request, timeout=timeout, context=context) as response:
-            raw = response.read()
-    except urllib.error.HTTPError as exc:
-        status = exc.code
-        if status in (401, 403):
-            raise APIError(_reauth_message(auth.source)) from None
-        if status == 404:
-            raise NoSubscriptionError("No Copilot quota on this account.") from None
+    # One retry on transient 5xx. Anything else (401/403/404/4xx) fails fast.
+    for attempt in range(2):
         try:
-            body = scrub(_body_excerpt(exc.read()), auth.token)
-        except Exception:
-            body = "<no response body>"
-        if 500 <= status < 600:
-            raise APIError(
-                f"GitHub Copilot API returned {status} at {url} — try again shortly."
-            ) from None
-        raise APIError(f"GitHub Copilot API returned {status} at {url}: {body}") from None
-    except TimeoutError:
-        raise APIError(f"Request to {auth.host} timed out after {timeout}s.") from None
-    except urllib.error.URLError as exc:
-        underlying = getattr(exc, "reason", exc)
-        raise APIError(f"Could not reach {auth.host}: {underlying}") from None
+            with urllib.request.urlopen(request, timeout=timeout, context=context) as response:
+                raw = response.read()
+            break
+        except urllib.error.HTTPError as exc:
+            status = exc.code
+            if status in (401, 403):
+                raise APIError(_reauth_message(auth.source)) from None
+            if status == 404:
+                raise NoSubscriptionError("No Copilot quota on this account.") from None
+            if 500 <= status < 600 and attempt == 0:
+                sleep(_RETRY_BACKOFF_S)
+                continue
+            try:
+                body = scrub(_body_excerpt(exc.read()), auth.token)
+            except Exception:
+                body = "<no response body>"
+            if 500 <= status < 600:
+                raise APIError(
+                    f"GitHub Copilot API returned {status} at {url} — try again shortly."
+                ) from None
+            raise APIError(f"GitHub Copilot API returned {status} at {url}: {body}") from None
+        except TimeoutError:
+            raise APIError(f"Request to {auth.host} timed out after {timeout}s.") from None
+        except urllib.error.URLError as exc:
+            underlying = getattr(exc, "reason", exc)
+            raise APIError(f"Could not reach {auth.host}: {underlying}") from None
 
     try:
         parsed = json.loads(raw.decode("utf-8"))
