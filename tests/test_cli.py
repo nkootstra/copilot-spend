@@ -102,3 +102,28 @@ def test_entrypoint_passes_through_system_exit(monkeypatch):
         cli_module._entrypoint()
 
     assert exc.value.code == 7
+
+
+def test_entrypoint_mentions_debug_env_in_error(monkeypatch, capsys):
+    def boom(_argv=None):
+        raise RuntimeError("kaboom")
+
+    monkeypatch.setattr(cli_module, "main", boom)
+    monkeypatch.delenv("COPILOT_SPEND_DEBUG", raising=False)
+
+    with pytest.raises(SystemExit):
+        cli_module._entrypoint()
+
+    err = capsys.readouterr().err
+    assert "COPILOT_SPEND_DEBUG" in err
+
+
+def test_entrypoint_reraises_under_debug_env(monkeypatch):
+    def boom(_argv=None):
+        raise RuntimeError("kaboom")
+
+    monkeypatch.setattr(cli_module, "main", boom)
+    monkeypatch.setenv("COPILOT_SPEND_DEBUG", "1")
+
+    with pytest.raises(RuntimeError, match="kaboom"):
+        cli_module._entrypoint()

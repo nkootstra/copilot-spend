@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from datetime import datetime, timezone
 from importlib.metadata import PackageNotFoundError, version
@@ -98,7 +99,12 @@ def _entrypoint() -> None:
     except SystemExit:
         raise
     except Exception as exc:
-        print(f"unexpected error: {exc}", file=sys.stderr)
+        if os.environ.get("COPILOT_SPEND_DEBUG") == "1":
+            raise
+        print(
+            f"unexpected error: {exc} (set COPILOT_SPEND_DEBUG=1 for a full traceback)",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
 
