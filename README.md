@@ -86,7 +86,7 @@ files or network calls.
 PyPI publication is pending. Until then, install from a local clone:
 
 ```sh
-git clone https://github.com/<you>/copilot-spend.git
+git clone https://github.com/nkootstra/copilot-spend.git
 cd copilot-spend
 
 # Option A: pipx
