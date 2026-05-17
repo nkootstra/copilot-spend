@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-05-17
+
+### Added
+
+- `copilot-spend whoami` subcommand: prints the active login, host,
+  credential source (native vs opencode), and Copilot plan. Falls back
+  gracefully when the account has no Copilot quota.
+- `copilot-spend --json` flag: renders the current spend as a stable,
+  sort-keyed JSON object suitable for piping into `jq`, dashboards, or
+  alerting. Documented schema; field additions are non-breaking.
+- `COPILOT_SPEND_QUIET=1` silences the permissive-perms warning when
+  the auth file isn't `0o600`. The warning itself now mentions the
+  escape hatch.
+- `COPILOT_SPEND_DEBUG=1` re-raises unexpected exceptions with a full
+  traceback and emits a one-line diagnostic if the reset-date field
+  can't be extracted from the API response.
+- One transparent retry on transient 5xx in `fetch_quota`, with a 0.5s
+  backoff. 401/403/404 still fail fast.
+- GitHub device-flow HTTP errors now surface the GitHub
+  `error_description` body, turning bare "GitHub returned 422" into
+  diagnosable messages.
+- Repo hygiene: `SECURITY.md`, Dependabot for pip and GitHub Actions,
+  weekly CodeQL python analysis.
+
+### Changed
+
+- CI: new lint job runs `ruff check`, `ruff format --check`, and
+  `mypy --strict` on every push and PR. Test job now collects coverage
+  with a 80% floor (ratcheting up as features land).
+- README documents the new subcommand, flag, and supported environment
+  variables.
+- `actions/upload-artifact` and `actions/download-artifact` bumped to v5
+  in the release workflow.
+
 ## [0.1.0] - 2026-05-17
 
 ### Added
@@ -40,5 +74,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Mermaid flowchart in the README covering the full login, logout, and
   bare-invocation flows.
 
-[Unreleased]: https://github.com/nkootstra/copilot-spend/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/nkootstra/copilot-spend/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/nkootstra/copilot-spend/releases/tag/v0.2.0
 [0.1.0]: https://github.com/nkootstra/copilot-spend/releases/tag/v0.1.0
