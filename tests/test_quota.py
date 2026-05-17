@@ -157,6 +157,26 @@ def test_reset_non_iso_returns_none():
     assert spend.reset is None
 
 
+def test_reset_miss_silent_without_debug_env(capsys, monkeypatch):
+    monkeypatch.delenv("COPILOT_SPEND_DEBUG", raising=False)
+    parse_quota(_payload(entitlement=300, remaining=-100, reset_value=None))
+
+    err = capsys.readouterr().err
+    assert err == ""
+
+
+def test_reset_miss_emits_diagnostic_under_debug_env(capsys, monkeypatch):
+    monkeypatch.setenv("COPILOT_SPEND_DEBUG", "1")
+    parse_quota(_payload(entitlement=300, remaining=-100, reset_value=None))
+
+    err = capsys.readouterr().err
+    assert "reset-date" in err
+    # Diagnostic mentions the candidate names so we can see what was tried.
+    assert "quota_reset_date" in err
+    # And lists the actual keys present so we can see what the API returned.
+    assert "premium_interactions keys" in err
+
+
 def test_missing_premium_interactions_raises_AE7():
     payload = {
         "login": "u",

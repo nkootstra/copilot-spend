@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+import sys
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
@@ -81,6 +83,18 @@ def _extract_reset(payload: dict[str, Any], pi: dict[str, Any]) -> datetime | No
         parsed = _parse_iso(cursor)
         if parsed is not None:
             return parsed
+    if os.environ.get("COPILOT_SPEND_DEBUG") == "1":
+        top_keys = sorted(payload.keys())
+        pi_keys = sorted(pi.keys())
+        print(
+            "debug: no reset-date field found. "
+            f"Tried top-level={list(RESET_FIELD_CANDIDATES)} and "
+            f"premium_interactions nested paths={list(RESET_NESTED_PATHS)}. "
+            f"Payload top-level keys={top_keys}. "
+            f"premium_interactions keys={pi_keys}. "
+            "If GitHub renamed the field, add the new name to RESET_FIELD_CANDIDATES.",
+            file=sys.stderr,
+        )
     return None
 
 
