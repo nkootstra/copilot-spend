@@ -185,6 +185,33 @@ def test_strict_mode_no_warning(tmp_path, missing_native, capsys):
     assert err == ""
 
 
+def test_permissive_warning_suppressed_by_quiet_env(tmp_path, missing_native, capsys, monkeypatch):
+    if os.name != "posix":
+        pytest.skip("POSIX permission check only")
+    auth_file = tmp_path / "auth.json"
+    auth_file.write_text(json.dumps({"github-copilot": {"access": "tok"}}), encoding="utf-8")
+    os.chmod(auth_file, 0o644)
+    monkeypatch.setenv("COPILOT_SPEND_QUIET", "1")
+
+    resolve_auth(native_path=missing_native, opencode_path=auth_file)
+
+    err = capsys.readouterr().err
+    assert err == ""
+
+
+def test_permissive_warning_mentions_quiet_env(tmp_path, missing_native, capsys):
+    if os.name != "posix":
+        pytest.skip("POSIX permission check only")
+    auth_file = tmp_path / "auth.json"
+    auth_file.write_text(json.dumps({"github-copilot": {"access": "tok"}}), encoding="utf-8")
+    os.chmod(auth_file, 0o644)
+
+    resolve_auth(native_path=missing_native, opencode_path=auth_file)
+
+    err = capsys.readouterr().err
+    assert "COPILOT_SPEND_QUIET" in err
+
+
 # --- New: multi-source resolution and native-file reading ---
 
 

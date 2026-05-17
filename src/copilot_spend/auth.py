@@ -72,6 +72,8 @@ _normalize_host = normalize_host
 def _warn_if_permissive(path: Path) -> None:
     if os.name != "posix":
         return
+    if os.environ.get("COPILOT_SPEND_QUIET") == "1":
+        return
     try:
         mode = path.stat().st_mode
     except OSError:
@@ -81,7 +83,8 @@ def _warn_if_permissive(path: Path) -> None:
         owner_octal = stat.S_IMODE(mode)
         print(
             f"warning: {path} permissions are {oct(owner_octal)} — "
-            "the file holds a long-lived Copilot token; consider `chmod 600`.",
+            "the file holds a long-lived Copilot token; consider `chmod 600`. "
+            "Set COPILOT_SPEND_QUIET=1 to silence.",
             file=sys.stderr,
         )
 
