@@ -15,12 +15,16 @@ Works against both `github.com` and GitHub Enterprise hosts.
    2. Opencode fallback: `~/.local/share/opencode/auth.json` (keys
       `github-copilot.access` and `github-copilot.enterpriseUrl`), if
       opencode is installed.
-2. Exchanges the OAuth token for a short-lived Copilot session token via
-   `/copilot_internal/v2/token`, caching it in
-   `~/.config/copilot-spend/session.json` until it expires.
+2. Picks the bearer token based on source:
+   - **Native** (`ghu_…` GitHub App token): exchanges it for a short-lived
+     Copilot session token via `/copilot_internal/v2/token`, caching the
+     result in `~/.config/copilot-spend/session.json` until it expires.
+   - **Opencode** (`gho_…` OAuth App token): uses the token directly. The
+     session-token exchange rejects `gho_` tokens with 404, so this path
+     preserves opencode's existing working behavior.
 3. Calls `GET /api/v3/copilot_internal/user` on your GHE host, or
    `GET https://api.github.com/copilot_internal/user` if no enterprise
-   host is configured, using the session token as `Bearer`.
+   host is configured, using the bearer token from step 2.
 4. Computes the billable overage:
    `billable_PRUs = max(0, consumed - entitlement)`, then
    `dollars_owed = billable_PRUs × $0.04`.
@@ -28,9 +32,10 @@ Works against both `github.com` and GitHub Enterprise hosts.
    and cost nothing.
 5. Prints a plain-text summary on stdout.
 
-No background daemon. No history. Two small JSON files under
-`~/.config/copilot-spend/` and one HTTP request per run (plus a session
-exchange roughly every 30 minutes).
+No background daemon. No history. One HTTP request per run. Native users
+also get a `session.json` cache under `~/.config/copilot-spend/` and a
+session exchange roughly every 30 minutes; opencode users have no extra
+files or network calls.
 
 ## Requirements
 
