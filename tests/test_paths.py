@@ -157,7 +157,9 @@ def test_assert_safe_parent_rejects_foreign_uid(monkeypatch, tmp_path):
         st_uid = os.getuid() + 99999
         st_mode = real_stat.st_mode
 
-    monkeypatch.setattr(Path, "stat", lambda self: _Foreign() if self == parent else real_stat)
+    monkeypatch.setattr(
+        Path, "stat", lambda self, **_kw: _Foreign() if self == parent else real_stat
+    )
 
     with pytest.raises(AuthError) as exc:
         paths.assert_safe_parent(parent)
