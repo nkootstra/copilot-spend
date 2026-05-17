@@ -39,6 +39,7 @@ jobs:
   publish-to-testpypi:
     name: Publish to TestPyPI
     needs: build
+    if: vars.PUBLISH_TO_TESTPYPI == 'true'
     runs-on: ubuntu-latest
     environment:
       name: testpypi
@@ -59,7 +60,7 @@ jobs:
 
   publish-to-pypi:
     name: Publish to PyPI
-    needs: publish-to-testpypi
+    needs: build
     runs-on: ubuntu-latest
     environment:
       name: pypi
