@@ -39,12 +39,12 @@ class NoSubscriptionError(Exception):
 class Spend:
     login: str
     plan: str
-    entitlement: int               # included free PRUs per period
-    consumed: int                  # total PRUs used this period (>= 0)
-    billable_prus: int             # max(0, consumed - entitlement)
-    free_remaining_prus: int       # max(0, entitlement - consumed)
-    dollars_owed: float            # billable_prus * PRU_PRICE_USD
-    dollars_entitlement: float     # entitlement * PRU_PRICE_USD (reference)
+    entitlement: int  # included free PRUs per period
+    consumed: int  # total PRUs used this period (>= 0)
+    billable_prus: int  # max(0, consumed - entitlement)
+    free_remaining_prus: int  # max(0, entitlement - consumed)
+    dollars_owed: float  # billable_prus * PRU_PRICE_USD
+    dollars_entitlement: float  # entitlement * PRU_PRICE_USD (reference)
     dollars_free_remaining: float  # free_remaining_prus * PRU_PRICE_USD
     reset: datetime | None
 
@@ -63,7 +63,7 @@ def _parse_iso(value: Any) -> datetime | None:
     return parsed
 
 
-def _extract_reset(payload: dict, pi: dict) -> datetime | None:
+def _extract_reset(payload: dict[str, Any], pi: dict[str, Any]) -> datetime | None:
     for source in (payload, pi):
         for name in RESET_FIELD_CANDIDATES:
             if name in source:
@@ -84,7 +84,7 @@ def _extract_reset(payload: dict, pi: dict) -> datetime | None:
     return None
 
 
-def parse_quota(payload: dict) -> Spend:
+def parse_quota(payload: dict[str, Any]) -> Spend:
     plan = payload.get("copilot_plan") or ""
     snapshots = payload.get("quota_snapshots") or {}
     pi = snapshots.get("premium_interactions") if isinstance(snapshots, dict) else None

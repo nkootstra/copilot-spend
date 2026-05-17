@@ -82,9 +82,11 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "login":
         from copilot_spend.login import run_login
+
         return run_login()
     if args.command == "logout":
         from copilot_spend.login import run_logout
+
         return run_logout()
 
     return _run_show_quota()

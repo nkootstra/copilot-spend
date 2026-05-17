@@ -9,7 +9,6 @@ from typing import Any
 import pytest
 
 from copilot_spend import api, login, paths
-from copilot_spend.auth import AuthError
 from copilot_spend.quota import NoSubscriptionError
 
 

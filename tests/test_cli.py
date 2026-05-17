@@ -31,6 +31,7 @@ def test_login_subcommand_dispatches(monkeypatch):
 
     # Patch the import target so the lazy import in main() picks up the fake.
     import copilot_spend.login as login_module
+
     monkeypatch.setattr(login_module, "run_login", fake_login)
 
     rc = cli_module.main(["login"])
@@ -47,6 +48,7 @@ def test_logout_subcommand_dispatches(monkeypatch):
         return 0
 
     import copilot_spend.login as login_module
+
     monkeypatch.setattr(login_module, "run_logout", fake_logout)
 
     rc = cli_module.main(["logout"])

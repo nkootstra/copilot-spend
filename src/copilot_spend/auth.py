@@ -59,7 +59,7 @@ def normalize_host(raw: str) -> str:
     host = raw.strip()
     for prefix in ("https://", "http://"):
         if host.startswith(prefix):
-            host = host[len(prefix):]
+            host = host[len(prefix) :]
             break
     return host.rstrip("/").strip()
 
@@ -102,23 +102,17 @@ def _read_opencode(path: Path) -> Auth | None:
 
     entry = data.get("github-copilot") or {}
     if not isinstance(entry, dict):
-        raise AuthError(
-            f"opencode auth file at {path} has a malformed github-copilot entry."
-        )
+        raise AuthError(f"opencode auth file at {path} has a malformed github-copilot entry.")
 
     token = entry.get("access")
     if not token or not isinstance(token, str):
-        raise AuthError(
-            f"No GitHub Copilot token in {path}. Run `opencode login` first."
-        )
+        raise AuthError(f"No GitHub Copilot token in {path}. Run `opencode login` first.")
 
     enterprise_raw = entry.get("enterpriseUrl")
     if enterprise_raw is None:
         enterprise_raw = ""
     if not isinstance(enterprise_raw, str):
-        raise AuthError(
-            f"opencode auth file at {path} has a non-string enterpriseUrl field."
-        )
+        raise AuthError(f"opencode auth file at {path} has a non-string enterpriseUrl field.")
 
     enterprise = normalize_host(enterprise_raw)
     if not enterprise:
@@ -153,27 +147,19 @@ def _read_native(path: Path) -> Auth | None:
 
     entry = data.get("github-copilot") or {}
     if not isinstance(entry, dict):
-        raise AuthError(
-            f"copilot-spend auth file at {path} has a malformed github-copilot entry."
-        )
+        raise AuthError(f"copilot-spend auth file at {path} has a malformed github-copilot entry.")
 
     token = entry.get("token")
     if not token or not isinstance(token, str):
-        raise AuthError(
-            f"No GitHub Copilot token in {path}. Run `copilot-spend login`."
-        )
+        raise AuthError(f"No GitHub Copilot token in {path}. Run `copilot-spend login`.")
 
     host_raw = entry.get("host", "")
     if not isinstance(host_raw, str):
-        raise AuthError(
-            f"copilot-spend auth file at {path} has a non-string host field."
-        )
+        raise AuthError(f"copilot-spend auth file at {path} has a non-string host field.")
 
     host = normalize_host(host_raw) or "github.com"
     if host != "github.com" and not is_valid_host(host):
-        raise AuthError(
-            f"host in {path} is not a valid hostname: {host_raw!r}."
-        )
+        raise AuthError(f"host in {path} is not a valid hostname: {host_raw!r}.")
 
     return Auth(token=token, host=host, source="native")
 
@@ -187,6 +173,7 @@ def resolve_auth(
         # Defer the import to call time so test monkeypatching of
         # COPILOT_SPEND_CONFIG_DIR is honored.
         from . import paths as _paths
+
         native_path = _paths.auth_path()
 
     native = _read_native(native_path)

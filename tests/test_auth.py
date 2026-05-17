@@ -57,7 +57,10 @@ def test_defaults_to_github_com_when_enterprise_url_empty(tmp_path, missing_nati
 
 def test_normalizes_https_prefix_and_trailing_slash(tmp_path, missing_native):
     auth_file = tmp_path / "auth.json"
-    _write(auth_file, {"github-copilot": {"access": "tok", "enterpriseUrl": "https://ghe.example.com/"}})
+    _write(
+        auth_file,
+        {"github-copilot": {"access": "tok", "enterpriseUrl": "https://ghe.example.com/"}},
+    )
 
     auth = resolve_auth(native_path=missing_native, opencode_path=auth_file)
 
@@ -66,7 +69,10 @@ def test_normalizes_https_prefix_and_trailing_slash(tmp_path, missing_native):
 
 def test_normalizes_http_prefix(tmp_path, missing_native):
     auth_file = tmp_path / "auth.json"
-    _write(auth_file, {"github-copilot": {"access": "tok", "enterpriseUrl": "http://internal.ghe.example/"}})
+    _write(
+        auth_file,
+        {"github-copilot": {"access": "tok", "enterpriseUrl": "http://internal.ghe.example/"}},
+    )
 
     auth = resolve_auth(native_path=missing_native, opencode_path=auth_file)
 
@@ -123,7 +129,9 @@ def test_invalid_hostname_rejected(tmp_path, missing_native):
 
 def test_hostname_with_port_rejected(tmp_path, missing_native):
     auth_file = tmp_path / "auth.json"
-    _write(auth_file, {"github-copilot": {"access": "tok", "enterpriseUrl": "ghe.example.com:8080"}})
+    _write(
+        auth_file, {"github-copilot": {"access": "tok", "enterpriseUrl": "ghe.example.com:8080"}}
+    )
 
     with pytest.raises(AuthError):
         resolve_auth(native_path=missing_native, opencode_path=auth_file)
@@ -131,7 +139,10 @@ def test_hostname_with_port_rejected(tmp_path, missing_native):
 
 def test_hostname_with_path_after_strip_rejected(tmp_path, missing_native):
     auth_file = tmp_path / "auth.json"
-    _write(auth_file, {"github-copilot": {"access": "tok", "enterpriseUrl": "https://ghe.example.com/oops"}})
+    _write(
+        auth_file,
+        {"github-copilot": {"access": "tok", "enterpriseUrl": "https://ghe.example.com/oops"}},
+    )
 
     with pytest.raises(AuthError):
         resolve_auth(native_path=missing_native, opencode_path=auth_file)

@@ -6,8 +6,14 @@ from copilot_spend.output import render
 from copilot_spend.quota import PRU_PRICE_USD, Spend
 
 
-def _spend(*, consumed: int, entitlement: int = 300, reset=None,
-           login: str = "test-user", plan: str = "business") -> Spend:
+def _spend(
+    *,
+    consumed: int,
+    entitlement: int = 300,
+    reset=None,
+    login: str = "test-user",
+    plan: str = "business",
+) -> Spend:
     billable = max(0, consumed - entitlement)
     free_left = max(0, entitlement - consumed)
     return Spend(
@@ -54,27 +60,21 @@ def test_output_contains_required_fields_over_cap():
 
 
 def test_overage_renders_billable_line_not_remaining_line():
-    out = render(_spend(consumed=400,
-                         reset=datetime(2026, 5, 31, tzinfo=timezone.utc)),
-                 now=NOW)
+    out = render(_spend(consumed=400, reset=datetime(2026, 5, 31, tzinfo=timezone.utc)), now=NOW)
 
     assert "Billable:" in out
     assert "Remaining:" not in out
 
 
 def test_under_cap_renders_remaining_line_not_billable_line():
-    out = render(_spend(consumed=100,
-                         reset=datetime(2026, 5, 31, tzinfo=timezone.utc)),
-                 now=NOW)
+    out = render(_spend(consumed=100, reset=datetime(2026, 5, 31, tzinfo=timezone.utc)), now=NOW)
 
     assert "Remaining:" in out
     assert "Billable:" not in out
 
 
 def test_exactly_at_cap_renders_remaining_with_zero():
-    out = render(_spend(consumed=300,
-                         reset=datetime(2026, 5, 31, tzinfo=timezone.utc)),
-                 now=NOW)
+    out = render(_spend(consumed=300, reset=datetime(2026, 5, 31, tzinfo=timezone.utc)), now=NOW)
 
     assert "Remaining:" in out
     assert "Billable:" not in out
@@ -90,9 +90,7 @@ def test_reset_none_renders_unknown_R13():
 
 
 def test_output_is_pure_ascii_R14():
-    out = render(_spend(consumed=4073,
-                         reset=datetime(2026, 5, 31, tzinfo=timezone.utc)),
-                 now=NOW)
+    out = render(_spend(consumed=4073, reset=datetime(2026, 5, 31, tzinfo=timezone.utc)), now=NOW)
 
     for ch in out:
         assert ord(ch) < 128, f"non-ASCII character {ch!r} (ord {ord(ch)}) in output"
@@ -100,9 +98,7 @@ def test_output_is_pure_ascii_R14():
 
 
 def test_dollar_format_always_two_decimals():
-    out = render(_spend(consumed=0,
-                         reset=datetime(2026, 5, 31, tzinfo=timezone.utc)),
-                 now=NOW)
+    out = render(_spend(consumed=0, reset=datetime(2026, 5, 31, tzinfo=timezone.utc)), now=NOW)
 
     assert "$12.00" in out
     assert "$12 " not in out

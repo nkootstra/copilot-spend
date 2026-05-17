@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import json
-import socket
 import ssl
 import sys
 import time
 import urllib.error
 import urllib.request
+from collections.abc import Callable
+from typing import IO, Any, cast
 
 from . import api, paths
 from .auth import Auth, AuthError, is_valid_host, normalize_host
@@ -29,7 +30,7 @@ def _access_token_url(host: str) -> str:
     return f"https://{host}/login/oauth/access_token"
 
 
-def _post_json(url: str, body: dict, *, timeout: float = 10.0) -> dict:
+def _post_json(url: str, body: dict[str, Any], *, timeout: float = 10.0) -> dict[str, Any]:
     request = urllib.request.Request(
         url,
         data=json.dumps(body).encode("utf-8"),
@@ -42,10 +43,13 @@ def _post_json(url: str, body: dict, *, timeout: float = 10.0) -> dict:
     context = ssl.create_default_context()
     with urllib.request.urlopen(request, timeout=timeout, context=context) as response:
         raw = response.read()
-    return json.loads(raw.decode("utf-8"))
+    parsed = json.loads(raw.decode("utf-8"))
+    if not isinstance(parsed, dict):
+        raise AuthError(f"Non-object JSON response from {url}.")
+    return cast(dict[str, Any], parsed)
 
 
-def _prompt_host(stdin=None, stderr=None) -> str:
+def _prompt_host(stdin: IO[str] | None = None, stderr: IO[str] | None = None) -> str:
     stdin = stdin or sys.stdin
     stderr = stderr or sys.stderr
     print("Where do you authenticate?", file=stderr)
@@ -69,7 +73,7 @@ def _prompt_host(stdin=None, stderr=None) -> str:
     return host
 
 
-def _request_device_code(host: str) -> dict:
+def _request_device_code(host: str) -> dict[str, Any]:
     url = _device_url(host)
     try:
         payload = _post_json(url, {"client_id": CLIENT_ID, "scope": OAUTH_SCOPE})
@@ -77,7 +81,7 @@ def _request_device_code(host: str) -> dict:
         raise AuthError(
             f"GitHub returned {exc.code} from {url}. Check the host and try again."
         ) from None
-    except (TimeoutError, socket.timeout):
+    except TimeoutError:
         raise AuthError(f"Timed out reaching {host} for device-code request.") from None
     except urllib.error.URLError as exc:
         underlying = getattr(exc, "reason", exc)
@@ -88,15 +92,11 @@ def _request_device_code(host: str) -> dict:
     error = payload.get("error")
     if error:
         description = payload.get("error_description", error)
-        raise AuthError(
-            f"GitHub rejected the device-code request ({error}): {description}."
-        )
+        raise AuthError(f"GitHub rejected the device-code request ({error}): {description}.")
 
     required = ("device_code", "user_code", "verification_uri", "interval")
     if not all(payload.get(k) for k in required):
-        raise AuthError(
-            f"Device-code response from {url} is missing required fields."
-        )
+        raise AuthError(f"Device-code response from {url} is missing required fields.")
     return payload
 
 
@@ -105,8 +105,8 @@ def _poll_for_token(
     device_code: str,
     interval: int,
     *,
-    now=time.monotonic,
-    sleep=time.sleep,
+    now: Callable[[], float] = time.monotonic,
+    sleep: Callable[[float], None] = time.sleep,
     max_wait: int = POLL_MAX_WAIT_S,
 ) -> str:
     url = _access_token_url(host)
@@ -130,7 +130,7 @@ def _poll_for_token(
             raise AuthError(
                 f"GitHub returned {exc.code} during token polling. Run `copilot-spend login` again."
             ) from None
-        except (TimeoutError, socket.timeout):
+        except TimeoutError:
             # Transient — keep polling within the time budget.
             continue
         except urllib.error.URLError as exc:
@@ -171,11 +171,11 @@ def _poll_for_token(
 
 def run_login(
     *,
-    stdin=None,
-    stdout=None,
-    stderr=None,
-    sleep=time.sleep,
-    now=time.monotonic,
+    stdin: IO[str] | None = None,
+    stdout: IO[str] | None = None,
+    stderr: IO[str] | None = None,
+    sleep: Callable[[float], None] = time.sleep,
+    now: Callable[[], float] = time.monotonic,
 ) -> int:
     stdin = stdin or sys.stdin
     stdout = stdout or sys.stdout
@@ -257,7 +257,7 @@ def run_login(
     return 0
 
 
-def run_logout(*, stdout=None) -> int:
+def run_logout(*, stdout: IO[str] | None = None) -> int:
     stdout = stdout or sys.stdout
     paths.delete_secret_file(paths.auth_path())
     # Legacy cleanup: pre-session-removal versions cached a session token here.

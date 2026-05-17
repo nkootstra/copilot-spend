@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import json
-import socket
 import ssl
 import urllib.error
 import urllib.request
 from importlib.metadata import PackageNotFoundError, version
+from typing import Any, cast
 
 from copilot_spend.auth import Auth
 from copilot_spend.paths import scrub
@@ -42,17 +42,14 @@ def _body_excerpt(raw: bytes, limit: int = 500) -> str:
 
 def _reauth_message(source: str) -> str:
     if source == "native":
-        return (
-            "Token rejected by GitHub Copilot. "
-            "Run `copilot-spend login` to re-authenticate."
-        )
+        return "Token rejected by GitHub Copilot. Run `copilot-spend login` to re-authenticate."
     return (
         "Token rejected by GitHub Copilot — opencode token may be expired. "
         "Run `opencode login` to refresh."
     )
 
 
-def fetch_quota(auth: Auth, *, timeout: float = 10.0) -> dict:
+def fetch_quota(auth: Auth, *, timeout: float = 10.0) -> dict[str, Any]:
     # `/copilot_internal/user` accepts the OAuth/GitHub-App user token
     # directly as Bearer for both `ghu_` (native) and `gho_` (opencode).
     # No session-token exchange — that token (`/copilot_internal/v2/token`)
@@ -78,9 +75,7 @@ def fetch_quota(auth: Auth, *, timeout: float = 10.0) -> dict:
         if status in (401, 403):
             raise APIError(_reauth_message(auth.source)) from None
         if status == 404:
-            raise NoSubscriptionError(
-                "No Copilot quota on this account."
-            ) from None
+            raise NoSubscriptionError("No Copilot quota on this account.") from None
         try:
             body = scrub(_body_excerpt(exc.read()), auth.token)
         except Exception:
@@ -89,26 +84,17 @@ def fetch_quota(auth: Auth, *, timeout: float = 10.0) -> dict:
             raise APIError(
                 f"GitHub Copilot API returned {status} at {url} — try again shortly."
             ) from None
-        raise APIError(
-            f"GitHub Copilot API returned {status} at {url}: {body}"
-        ) from None
+        raise APIError(f"GitHub Copilot API returned {status} at {url}: {body}") from None
     except TimeoutError:
-        raise APIError(
-            f"Request to {auth.host} timed out after {timeout}s."
-        ) from None
-    except socket.timeout:
-        raise APIError(
-            f"Request to {auth.host} timed out after {timeout}s."
-        ) from None
+        raise APIError(f"Request to {auth.host} timed out after {timeout}s.") from None
     except urllib.error.URLError as exc:
         underlying = getattr(exc, "reason", exc)
-        raise APIError(
-            f"Could not reach {auth.host}: {underlying}"
-        ) from None
+        raise APIError(f"Could not reach {auth.host}: {underlying}") from None
 
     try:
-        return json.loads(raw.decode("utf-8"))
+        parsed = json.loads(raw.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise APIError(
-            f"GitHub Copilot API at {url} returned a non-JSON response: {exc}"
-        ) from None
+        raise APIError(f"GitHub Copilot API at {url} returned a non-JSON response: {exc}") from None
+    if not isinstance(parsed, dict):
+        raise APIError(f"GitHub Copilot API at {url} returned non-object JSON.") from None
+    return cast(dict[str, Any], parsed)

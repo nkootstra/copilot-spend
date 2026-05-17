@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import io
 import json
-import socket
 import urllib.error
 from unittest.mock import MagicMock, patch
 
@@ -76,7 +75,7 @@ def test_request_does_not_send_copilot_integration_id_header():
         fetch_quota(auth)
 
     request_arg = urlopen.call_args.args[0]
-    header_keys = {k.lower() for k in request_arg.headers.keys()}
+    header_keys = {k.lower() for k in request_arg.headers}
     assert "copilot-integration-id" not in header_keys
 
 
@@ -238,7 +237,7 @@ def test_socket_timeout_mentions_duration():
     auth = Auth(token="t", host="ghe.example.com")
 
     with patch("copilot_spend.api.urllib.request.urlopen") as urlopen:
-        urlopen.side_effect = socket.timeout("timed out")
+        urlopen.side_effect = TimeoutError("timed out")
         with pytest.raises(APIError) as exc:
             fetch_quota(auth, timeout=7.5)
 

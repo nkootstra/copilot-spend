@@ -7,15 +7,20 @@ import pytest
 from copilot_spend.quota import (
     PRU_PRICE_USD,
     NoSubscriptionError,
-    Spend,
     parse_quota,
 )
 
 
-def _payload(*, entitlement: int, remaining: int, reset_field: str = "next_reset",
-             reset_value: str | None = "2026-05-31T00:00:00Z",
-             plan: str = "business", login: str = "u",
-             nested_reset: dict | None = None) -> dict:
+def _payload(
+    *,
+    entitlement: int,
+    remaining: int,
+    reset_field: str = "next_reset",
+    reset_value: str | None = "2026-05-31T00:00:00Z",
+    plan: str = "business",
+    login: str = "u",
+    nested_reset: dict | None = None,
+) -> dict:
     pi: dict = {"entitlement": entitlement, "remaining": remaining}
     if reset_value is not None:
         pi[reset_field] = reset_value
@@ -84,30 +89,30 @@ def test_positive_remaining_treated_as_zero_consumption():
 
 
 def test_reset_parses_iso8601_with_z_suffix():
-    spend = parse_quota(_payload(entitlement=300, remaining=-100,
-                                  reset_value="2026-05-31T00:00:00Z"))
+    spend = parse_quota(
+        _payload(entitlement=300, remaining=-100, reset_value="2026-05-31T00:00:00Z")
+    )
 
     assert spend.reset is not None
     assert spend.reset == datetime(2026, 5, 31, tzinfo=timezone.utc)
 
 
 def test_reset_parses_iso8601_with_explicit_offset():
-    spend = parse_quota(_payload(entitlement=300, remaining=-100,
-                                  reset_value="2026-05-31T12:00:00+00:00"))
+    spend = parse_quota(
+        _payload(entitlement=300, remaining=-100, reset_value="2026-05-31T12:00:00+00:00")
+    )
 
     assert spend.reset is not None
 
 
 def test_reset_uses_second_candidate_when_first_absent():
-    spend = parse_quota(_payload(entitlement=300, remaining=-100,
-                                  reset_field="reset_date"))
+    spend = parse_quota(_payload(entitlement=300, remaining=-100, reset_field="reset_date"))
 
     assert spend.reset is not None
 
 
 def test_reset_uses_third_candidate_when_first_two_absent():
-    spend = parse_quota(_payload(entitlement=300, remaining=-100,
-                                  reset_field="resets_at"))
+    spend = parse_quota(_payload(entitlement=300, remaining=-100, reset_field="resets_at"))
 
     assert spend.reset is not None
 
@@ -122,15 +127,18 @@ def test_reset_finds_top_level_quota_reset_date():
 
 
 def test_reset_date_only_string_attaches_utc():
-    spend = parse_quota(_payload(entitlement=300, remaining=-100,
-                                  reset_value="2026-05-31"))
+    spend = parse_quota(_payload(entitlement=300, remaining=-100, reset_value="2026-05-31"))
 
     assert spend.reset == datetime(2026, 5, 31, tzinfo=timezone.utc)
 
 
 def test_reset_finds_nested_reset_date():
-    payload = _payload(entitlement=300, remaining=-100, reset_value=None,
-                       nested_reset={"reset": {"date": "2026-05-31T00:00:00Z"}})
+    payload = _payload(
+        entitlement=300,
+        remaining=-100,
+        reset_value=None,
+        nested_reset={"reset": {"date": "2026-05-31T00:00:00Z"}},
+    )
 
     spend = parse_quota(payload)
 
@@ -144,8 +152,7 @@ def test_reset_missing_returns_none_AE5():
 
 
 def test_reset_non_iso_returns_none():
-    spend = parse_quota(_payload(entitlement=300, remaining=-100,
-                                  reset_value="next-tuesday"))
+    spend = parse_quota(_payload(entitlement=300, remaining=-100, reset_value="next-tuesday"))
 
     assert spend.reset is None
 
@@ -175,9 +182,7 @@ def test_null_premium_interactions_raises():
 def test_missing_copilot_plan_raises():
     payload = {
         "login": "u",
-        "quota_snapshots": {
-            "premium_interactions": {"entitlement": 300, "remaining": -100}
-        },
+        "quota_snapshots": {"premium_interactions": {"entitlement": 300, "remaining": -100}},
     }
 
     with pytest.raises(NoSubscriptionError):
@@ -192,8 +197,9 @@ def test_empty_quota_snapshots_raises():
 
 
 def test_login_and_plan_populated():
-    spend = parse_quota(_payload(entitlement=300, remaining=-100,
-                                  plan="business", login="test-user"))
+    spend = parse_quota(
+        _payload(entitlement=300, remaining=-100, plan="business", login="test-user")
+    )
 
     assert spend.login == "test-user"
     assert spend.plan == "business"
@@ -202,9 +208,7 @@ def test_login_and_plan_populated():
 def test_missing_login_becomes_empty_string():
     payload = {
         "copilot_plan": "business",
-        "quota_snapshots": {
-            "premium_interactions": {"entitlement": 300, "remaining": -100}
-        },
+        "quota_snapshots": {"premium_interactions": {"entitlement": 300, "remaining": -100}},
     }
 
     spend = parse_quota(payload)
