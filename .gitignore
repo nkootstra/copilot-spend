@@ -216,3 +216,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Project-internal planning docs (brainstorms, plans) — never ship to PyPI or git
+docs/

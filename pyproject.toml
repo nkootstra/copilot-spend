@@ -33,8 +33,21 @@ dependencies = []
 [project.optional-dependencies]
 dev = ["pytest>=7"]
 
+[project.urls]
+Homepage = "https://github.com/nkootstra/copilot-spend"
+Source = "https://github.com/nkootstra/copilot-spend"
+Issues = "https://github.com/nkootstra/copilot-spend/issues"
+Changelog = "https://github.com/nkootstra/copilot-spend/blob/main/CHANGELOG.md"
+Documentation = "https://github.com/nkootstra/copilot-spend#readme"
+
 [project.scripts]
 copilot-spend = "copilot_spend.cli:_entrypoint"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/copilot_spend"]
+
+[tool.hatch.build.targets.sdist]
+exclude = [
+    "/.github",
+    "/docs",
+]
