@@ -7,8 +7,7 @@ import urllib.error
 import urllib.request
 from importlib.metadata import PackageNotFoundError, version
 
-from copilot_spend import session
-from copilot_spend.auth import Auth, AuthError
+from copilot_spend.auth import Auth
 from copilot_spend.paths import scrub
 from copilot_spend.quota import NoSubscriptionError
 
@@ -54,25 +53,15 @@ def _reauth_message(source: str) -> str:
 
 
 def fetch_quota(auth: Auth, *, timeout: float = 10.0) -> dict:
-    # Opencode-issued tokens are OAuth-App `gho_…` tokens that the Copilot
-    # session-token exchange rejects with 404. Preserve the historical
-    # "raw OAuth token as Bearer" path for opencode users; native users
-    # ride the session-exchange path that AE5 / AE10 describe.
-    if auth.source == "native":
-        try:
-            bearer_token: str = session.get_or_refresh(auth)
-        except AuthError as exc:
-            raise APIError(scrub(str(exc), auth.token)) from None
-        except session.APIError as exc:
-            raise APIError(scrub(str(exc), auth.token)) from None
-    else:
-        bearer_token = auth.token
-
+    # `/copilot_internal/user` accepts the OAuth/GitHub-App user token
+    # directly as Bearer for both `ghu_` (native) and `gho_` (opencode).
+    # No session-token exchange — that token (`/copilot_internal/v2/token`)
+    # is for the Copilot Chat proxy at api.githubcopilot.com, not this endpoint.
     url = _build_url(auth.host)
     request = urllib.request.Request(
         url,
         headers={
-            "Authorization": f"Bearer {bearer_token}",
+            "Authorization": f"Bearer {auth.token}",
             "User-Agent": f"copilot-spend/{_package_version()}",
             "Accept": "application/json",
         },
@@ -93,7 +82,7 @@ def fetch_quota(auth: Auth, *, timeout: float = 10.0) -> dict:
                 "No Copilot quota on this account."
             ) from None
         try:
-            body = scrub(_body_excerpt(exc.read()), auth.token, bearer_token)
+            body = scrub(_body_excerpt(exc.read()), auth.token)
         except Exception:
             body = "<no response body>"
         if 500 <= status < 600:

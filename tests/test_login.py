@@ -3,14 +3,14 @@ from __future__ import annotations
 import io
 import json
 import stat
-import time
 import urllib.error
 from typing import Any
 
 import pytest
 
-from copilot_spend import login, paths, session
+from copilot_spend import api, login, paths
 from copilot_spend.auth import AuthError
+from copilot_spend.quota import NoSubscriptionError
 
 
 @pytest.fixture(autouse=True)
@@ -56,10 +56,7 @@ def test_run_login_happy_github_com(monkeypatch, capsys):
         {"access_token": "ghu_realtoken"},
     )
     monkeypatch.setattr(login, "_post_json", fake)
-    monkeypatch.setattr(
-        session, "exchange_token",
-        lambda auth, **_: {"token": "sess_xyz", "expires_at": int(time.time()) + 1800},
-    )
+    monkeypatch.setattr(api, "fetch_quota", lambda auth, **_: {"login": "u"})
 
     rc = login.run_login(
         stdin=_stdin("1\n"),
@@ -75,9 +72,6 @@ def test_run_login_happy_github_com(monkeypatch, capsys):
     auth_data = json.loads(paths.auth_path().read_text())
     assert auth_data == {"github-copilot": {"token": "ghu_realtoken", "host": "github.com"}}
     assert stat.S_IMODE(paths.auth_path().stat().st_mode) == 0o600
-    assert paths.session_path().exists()
-    sess_data = json.loads(paths.session_path().read_text())
-    assert sess_data["token"] == "sess_xyz"
 
 
 def test_run_login_happy_ghe(monkeypatch, capsys):
@@ -90,10 +84,7 @@ def test_run_login_happy_ghe(monkeypatch, capsys):
         return {"access_token": "ghu_ghe"}
 
     monkeypatch.setattr(login, "_post_json", fake_post)
-    monkeypatch.setattr(
-        session, "exchange_token",
-        lambda auth, **_: {"token": "sess_ghe", "expires_at": int(time.time()) + 1800},
-    )
+    monkeypatch.setattr(api, "fetch_quota", lambda auth, **_: {"login": "u"})
 
     rc = login.run_login(
         stdin=_stdin("2\nghe.example.com\n"),
@@ -210,10 +201,7 @@ def test_run_login_slow_down_extends_interval(monkeypatch, capsys):
         {"access_token": "ghu_ok"},
     )
     monkeypatch.setattr(login, "_post_json", fake)
-    monkeypatch.setattr(
-        session, "exchange_token",
-        lambda auth, **_: {"token": "sess", "expires_at": int(time.time()) + 1800},
-    )
+    monkeypatch.setattr(api, "fetch_quota", lambda auth, **_: {"login": "u"})
 
     sleeps: list[int] = []
     rc = login.run_login(
@@ -254,9 +242,9 @@ def test_run_login_verification_failure_does_not_write_auth(monkeypatch, capsys)
     monkeypatch.setattr(login, "_post_json", fake)
 
     def boom(_auth, **_):
-        raise AuthError("server says no")
+        raise api.APIError("server says no")
 
-    monkeypatch.setattr(session, "exchange_token", boom)
+    monkeypatch.setattr(api, "fetch_quota", boom)
 
     rc = login.run_login(
         stdin=_stdin("1\n"),
@@ -268,7 +256,6 @@ def test_run_login_verification_failure_does_not_write_auth(monkeypatch, capsys)
     err = capsys.readouterr().err
     assert "verification failed" in err
     assert not paths.auth_path().exists()
-    assert not paths.session_path().exists()
 
 
 def test_run_login_verification_error_redacts_token(monkeypatch, capsys):
@@ -279,9 +266,9 @@ def test_run_login_verification_error_redacts_token(monkeypatch, capsys):
     monkeypatch.setattr(login, "_post_json", fake)
 
     def boom(_auth, **_):
-        raise AuthError("server says: ghu_secret_realtoken is bad")
+        raise api.APIError("server says: ghu_secret_realtoken is bad")
 
-    monkeypatch.setattr(session, "exchange_token", boom)
+    monkeypatch.setattr(api, "fetch_quota", boom)
 
     rc = login.run_login(
         stdin=_stdin("1\n"),
@@ -293,6 +280,30 @@ def test_run_login_verification_error_redacts_token(monkeypatch, capsys):
     err = capsys.readouterr().err
     assert "ghu_secret_realtoken" not in err
     assert "<redacted-token>" in err
+
+
+def test_run_login_no_subscription_exits_2(monkeypatch, capsys):
+    fake, _ = _post_json_sequence(
+        _device_response(),
+        {"access_token": "ghu_no_sub"},
+    )
+    monkeypatch.setattr(login, "_post_json", fake)
+
+    def no_sub(_auth, **_):
+        raise NoSubscriptionError("nope")
+
+    monkeypatch.setattr(api, "fetch_quota", no_sub)
+
+    rc = login.run_login(
+        stdin=_stdin("1\n"),
+        sleep=lambda _s: None,
+        now=lambda: 0.0,
+    )
+
+    assert rc == 2
+    err = capsys.readouterr().err
+    assert "no copilot quota" in err.lower()
+    assert not paths.auth_path().exists()
 
 
 def test_run_login_reauth_notice_on_existing_auth(monkeypatch, capsys):
@@ -307,10 +318,7 @@ def test_run_login_reauth_notice_on_existing_auth(monkeypatch, capsys):
         {"access_token": "ghu_new"},
     )
     monkeypatch.setattr(login, "_post_json", fake)
-    monkeypatch.setattr(
-        session, "exchange_token",
-        lambda auth, **_: {"token": "sess", "expires_at": int(time.time()) + 1800},
-    )
+    monkeypatch.setattr(api, "fetch_quota", lambda auth, **_: {"login": "u"})
 
     rc = login.run_login(
         stdin=_stdin("1\n"),
@@ -322,6 +330,29 @@ def test_run_login_reauth_notice_on_existing_auth(monkeypatch, capsys):
     err = capsys.readouterr().err
     assert "Re-authenticating" in err
     assert json.loads(paths.auth_path().read_text())["github-copilot"]["token"] == "ghu_new"
+
+
+def test_run_login_cleans_up_legacy_session_json(monkeypatch, capsys, tmp_path):
+    # Pre-existing legacy session.json from prior version.
+    legacy = paths.config_dir() / "session.json"
+    paths.write_secret_file(legacy, {"token": "old_sess", "expires_at": 1})
+    assert legacy.exists()
+
+    fake, _ = _post_json_sequence(
+        _device_response(),
+        {"access_token": "ghu_x"},
+    )
+    monkeypatch.setattr(login, "_post_json", fake)
+    monkeypatch.setattr(api, "fetch_quota", lambda auth, **_: {"login": "u"})
+
+    rc = login.run_login(
+        stdin=_stdin("1\n"),
+        sleep=lambda _s: None,
+        now=lambda: 0.0,
+    )
+
+    assert rc == 0
+    assert not legacy.exists(), "login should remove stale legacy session.json"
 
 
 def test_run_login_ctrl_c_during_polling(monkeypatch, capsys):
@@ -355,16 +386,17 @@ def test_run_login_rejects_ssrf_target(monkeypatch, capsys):
     assert not paths.auth_path().exists()
 
 
-def test_run_logout_removes_both_files(capsys):
+def test_run_logout_removes_auth_and_legacy_session(capsys):
     paths.write_secret_file(paths.auth_path(), {"k": "v"})
-    paths.write_secret_file(paths.session_path(), {"token": "sess", "expires_at": 1})
+    legacy = paths.config_dir() / "session.json"
+    paths.write_secret_file(legacy, {"token": "sess", "expires_at": 1})
 
     rc = login.run_logout()
 
     assert rc == 0
     assert "Logged out" in capsys.readouterr().out
     assert not paths.auth_path().exists()
-    assert not paths.session_path().exists()
+    assert not legacy.exists()
 
 
 def test_run_logout_when_missing_is_idempotent(capsys):

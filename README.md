@@ -16,26 +16,22 @@ flowchart TD
     Host --> DeviceCode[POST /login/device/code]
     DeviceCode --> ShowCode[show user code + verification URL]
     ShowCode --> Poll[poll /login/oauth/access_token]
-    Poll -- access_denied / expired --> LoginFail[/exit 1: login failed/]
-    Poll -- ghu_ token --> Verify[verify via session-token exchange]
+    Poll -- access_denied / expired --> LoginFail[/exit 2: login failed/]
+    Poll -- ghu_ token --> Verify[verify token works<br/>GET /copilot_internal/user]
     Verify -- fail --> LoginFail
-    Verify -- ok --> WriteAuth[write auth.json + session.json 0o600]
+    Verify -- ok --> WriteAuth[write auth.json 0o600]
     WriteAuth --> LoginDone[/exit 0/]
 
-    Cmd -- logout --> DeleteFiles[delete auth.json + session.json]
+    Cmd -- logout --> DeleteFiles[delete auth.json]
     DeleteFiles --> LogoutDone[/exit 0/]
 
     Cmd -- bare --> Native{native<br/>~/.config/copilot-spend/auth.json?}
-    Native -- yes --> Cache{session.json<br/>still valid?}
-    Cache -- yes --> SessBearer[bearer = cached session token]
-    Cache -- no --> Exchange[exchange ghu_ for session token]
-    Exchange --> CacheWrite[write session.json 0o600]
-    CacheWrite --> SessBearer
+    Native -- yes --> NativeBearer[bearer = ghu_ token]
     Native -- no --> Opencode{opencode<br/>~/.local/share/opencode/auth.json?}
-    Opencode -- yes --> RawBearer[bearer = raw gho_ token<br/>session exchange skipped]
+    Opencode -- yes --> OpencodeBearer[bearer = gho_ token]
     Opencode -- no --> NoCreds[/exit 2: run copilot-spend login/]
-    SessBearer --> Quota[GET /copilot_internal/user with Bearer]
-    RawBearer --> Quota
+    NativeBearer --> Quota[GET /copilot_internal/user with Bearer]
+    OpencodeBearer --> Quota
     Quota -- 200 --> Print[/print spend + reset date<br/>exit 0/]
     Quota -- 401 / 403 --> AuthErr[/exit 2: re-authenticate/]
     Quota -- 404 --> NoSub[/exit 4: no Copilot quota/]
@@ -51,16 +47,13 @@ The bare `copilot-spend` invocation, expanded as numbered steps:
    2. Opencode fallback: `~/.local/share/opencode/auth.json` (keys
       `github-copilot.access` and `github-copilot.enterpriseUrl`), if
       opencode is installed.
-2. Picks the bearer token based on source:
-   - **Native** (`ghu_…` GitHub App token): exchanges it for a short-lived
-     Copilot session token via `/copilot_internal/v2/token`, caching the
-     result in `~/.config/copilot-spend/session.json` until it expires.
-   - **Opencode** (`gho_…` OAuth App token): uses the token directly. The
-     session-token exchange rejects `gho_` tokens with 404, so this path
-     preserves opencode's existing working behavior.
+2. Uses the resolved token directly as the `Bearer` for the next step.
+   Both source kinds work the same way: native gives a `ghu_…` GitHub App
+   user-to-server token, opencode gives a `gho_…` OAuth App token, and
+   `/copilot_internal/user` accepts either one directly.
 3. Calls `GET /api/v3/copilot_internal/user` on your GHE host, or
    `GET https://api.github.com/copilot_internal/user` if no enterprise
-   host is configured, using the bearer token from step 2.
+   host is configured.
 4. Computes the billable overage:
    `billable_PRUs = max(0, consumed - entitlement)`, then
    `dollars_owed = billable_PRUs × $0.04`.
@@ -68,10 +61,8 @@ The bare `copilot-spend` invocation, expanded as numbered steps:
    and cost nothing.
 5. Prints a plain-text summary on stdout.
 
-No background daemon. No history. One HTTP request per run. Native users
-also get a `session.json` cache under `~/.config/copilot-spend/` and a
-session exchange roughly every 30 minutes; opencode users have no extra
-files or network calls.
+No background daemon. No history. No session-token cache. One HTTP
+request per run.
 
 ## Requirements
 
@@ -109,10 +100,11 @@ copilot-spend logout   # remove copilot-spend's stored credentials
 
 `copilot-spend login` prompts for github.com or a GHE host, shows a
 device code with a URL to visit, then polls until you complete the
-flow in your browser. Credentials land in
-`~/.config/copilot-spend/auth.json` (mode `0o600`). If you already have
-opencode authenticated, the bare `copilot-spend` command continues to
-work without login.
+flow in your browser. The new token is verified against
+`/copilot_internal/user` before anything gets persisted. Credentials
+land in `~/.config/copilot-spend/auth.json` (mode `0o600`). If you
+already have opencode authenticated, the bare `copilot-spend` command
+continues to work without login.
 
 Example output (under your allowance):
 

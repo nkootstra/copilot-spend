@@ -9,23 +9,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from copilot_spend.api import APIError, fetch_quota
-from copilot_spend.auth import Auth, AuthError
+from copilot_spend.auth import Auth
 from copilot_spend.quota import NoSubscriptionError
-
-
-SESSION_TOKEN = "sess-test-token"
-
-
-@pytest.fixture(autouse=True)
-def _stub_session(monkeypatch):
-    """Default: session.get_or_refresh returns a sentinel token without disk/network I/O.
-
-    Tests that need to assert exchange behavior or simulate session failures
-    override this by patching copilot_spend.api.session.get_or_refresh directly.
-    """
-    from copilot_spend import api as api_module
-
-    monkeypatch.setattr(api_module.session, "get_or_refresh", lambda _auth: SESSION_TOKEN)
 
 
 def _make_response(payload: dict, status: int = 200):
@@ -95,7 +80,9 @@ def test_request_does_not_send_copilot_integration_id_header():
     assert "copilot-integration-id" not in header_keys
 
 
-def test_native_source_uses_session_token_as_bearer():
+def test_native_source_uses_oauth_token_as_bearer_directly():
+    # /copilot_internal/user accepts the ghu_ user-to-server token directly.
+    # No session-token exchange — that token is for api.githubcopilot.com.
     auth = Auth(token="ghu_oauth_secret", host="ghe.example.com", source="native")
 
     with patch("copilot_spend.api.urllib.request.urlopen") as urlopen:
@@ -103,33 +90,18 @@ def test_native_source_uses_session_token_as_bearer():
         fetch_quota(auth)
 
     request_arg = urlopen.call_args.args[0]
-    assert request_arg.headers["Authorization"] == f"Bearer {SESSION_TOKEN}"
-    # The raw OAuth token never appears on the wire.
-    assert "ghu_oauth_secret" not in request_arg.headers["Authorization"]
+    assert request_arg.headers["Authorization"] == "Bearer ghu_oauth_secret"
 
 
 def test_opencode_source_uses_oauth_token_as_bearer_directly():
-    # Opencode tokens are gho_ OAuth-App tokens that the Copilot session-token
-    # exchange rejects with 404. Preserve the historical raw-bearer path so
-    # opencode users see zero behavior change.
-    from copilot_spend import api as api_module
-
-    sentinel = {"called": False}
-
-    def fail_if_called(_auth):
-        sentinel["called"] = True
-        raise AssertionError("session.get_or_refresh must not be called for opencode source")
-
-    api_module.session.get_or_refresh = fail_if_called  # type: ignore[assignment]
-
     auth = Auth(token="gho_opencode_token", host="ghe.example.com", source="opencode")
+
     with patch("copilot_spend.api.urllib.request.urlopen") as urlopen:
         urlopen.return_value = _make_response({"ok": True})
         fetch_quota(auth)
 
     request_arg = urlopen.call_args.args[0]
     assert request_arg.headers["Authorization"] == "Bearer gho_opencode_token"
-    assert sentinel["called"] is False
 
 
 def test_request_includes_user_agent_with_version():
@@ -283,34 +255,3 @@ def test_error_messages_do_not_contain_bearer_token():
             fetch_quota(auth)
 
     assert "hunter2-secret-token" not in str(exc.value)
-
-
-def test_error_messages_redact_session_token(monkeypatch):
-    auth = Auth(token="ghu_secret", host="ghe.example.com", source="native")
-    leaky_body = f'{{"token":"{SESSION_TOKEN}","status":"error"}}'.encode()
-
-    with patch("copilot_spend.api.urllib.request.urlopen") as urlopen:
-        urlopen.side_effect = _http_error(418, leaky_body)
-        with pytest.raises(APIError) as exc:
-            fetch_quota(auth)
-
-    assert SESSION_TOKEN not in str(exc.value)
-
-
-def test_session_auth_error_propagates_as_apierror(monkeypatch):
-    auth = Auth(token="ghu_x", host="ghe.example.com", source="native")
-
-    def boom(_auth):
-        raise AuthError("server says: ghu_x rejected")
-
-    from copilot_spend import api as api_module
-    monkeypatch.setattr(api_module.session, "get_or_refresh", boom)
-
-    with patch("copilot_spend.api.urllib.request.urlopen") as urlopen:
-        with pytest.raises(APIError) as exc:
-            fetch_quota(auth)
-
-    # No quota call should have been attempted.
-    urlopen.assert_not_called()
-    # OAuth token must be redacted from the propagated message.
-    assert "ghu_x" not in str(exc.value)

@@ -8,8 +8,9 @@ import time
 import urllib.error
 import urllib.request
 
-from . import paths, session
+from . import api, paths
 from .auth import Auth, AuthError, is_valid_host, normalize_host
+from .quota import NoSubscriptionError
 
 CLIENT_ID = "Iv1.b507a08c87ecfe98"
 OAUTH_SCOPE = "read:user"
@@ -218,8 +219,14 @@ def run_login(
     auth = Auth(token=token, host=host, source="native")
 
     try:
-        session_payload = session.exchange_token(auth)
-    except (AuthError, session.APIError) as exc:
+        api.fetch_quota(auth)
+    except NoSubscriptionError:
+        print(
+            "error: post-login verification failed: this account has no Copilot quota.",
+            file=stderr,
+        )
+        return 2
+    except api.APIError as exc:
         scrubbed = paths.scrub(str(exc), token)
         print(f"error: post-login verification failed: {scrubbed}", file=stderr)
         return 2
@@ -236,13 +243,15 @@ def run_login(
             target,
             {"github-copilot": {"token": token, "host": host}},
         )
-        paths.write_secret_file(paths.session_path(), session_payload)
     except AuthError as exc:
         print(f"error: could not write credentials: {exc}", file=stderr)
         return 2
     except OSError as exc:
         print(f"error: could not write credentials: {exc}", file=stderr)
         return 2
+
+    # Clean up any stale session.json from versions that cached a session token.
+    paths.delete_secret_file(paths.config_dir() / "session.json")
 
     print(f"Logged in to GitHub Copilot via {host}.", file=stdout)
     return 0
@@ -251,6 +260,7 @@ def run_login(
 def run_logout(*, stdout=None) -> int:
     stdout = stdout or sys.stdout
     paths.delete_secret_file(paths.auth_path())
-    paths.delete_secret_file(paths.session_path())
+    # Legacy cleanup: pre-session-removal versions cached a session token here.
+    paths.delete_secret_file(paths.config_dir() / "session.json")
     print("Logged out of copilot-spend.", file=stdout)
     return 0

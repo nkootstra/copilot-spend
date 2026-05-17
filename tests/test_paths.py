@@ -37,11 +37,10 @@ def test_config_dir_override_wins_over_xdg(monkeypatch, tmp_path):
     assert paths.config_dir() == override
 
 
-def test_auth_and_session_paths(monkeypatch, tmp_path):
+def test_auth_path_uses_config_dir(monkeypatch, tmp_path):
     monkeypatch.setenv("COPILOT_SPEND_CONFIG_DIR", str(tmp_path))
 
     assert paths.auth_path() == tmp_path / "auth.json"
-    assert paths.session_path() == tmp_path / "session.json"
 
 
 def test_write_secret_file_sets_0600_on_file(monkeypatch, tmp_path):

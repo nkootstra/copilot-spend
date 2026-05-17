@@ -24,10 +24,6 @@ def auth_path() -> Path:
     return config_dir() / "auth.json"
 
 
-def session_path() -> Path:
-    return config_dir() / "session.json"
-
-
 def assert_safe_parent(parent: Path) -> None:
     if os.name != "posix":
         return
