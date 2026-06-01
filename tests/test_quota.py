@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 import pytest
 
 from copilot_spend.quota import (
+    AI_CREDIT_PRICE_USD,
     PRU_PRICE_USD,
     NoSubscriptionError,
     parse_quota,
@@ -20,17 +21,24 @@ def _payload(
     plan: str = "business",
     login: str = "u",
     nested_reset: dict | None = None,
+    token_based_billing: bool | None = None,
+    snapshot_fields: dict | None = None,
 ) -> dict:
     pi: dict = {"entitlement": entitlement, "remaining": remaining}
     if reset_value is not None:
         pi[reset_field] = reset_value
     if nested_reset is not None:
         pi.update(nested_reset)
-    return {
+    if snapshot_fields is not None:
+        pi.update(snapshot_fields)
+    payload = {
         "login": login,
         "copilot_plan": plan,
         "quota_snapshots": {"premium_interactions": pi},
     }
+    if token_based_billing is not None:
+        payload["token_based_billing"] = token_based_billing
+    return payload
 
 
 def test_overage_math_AE3():
@@ -86,6 +94,85 @@ def test_positive_remaining_treated_as_zero_consumption():
     assert spend.consumed == 0
     assert spend.billable_prus == 0
     assert spend.free_remaining_prus == 300
+
+
+def test_token_based_billing_positive_remaining_counts_down_from_entitlement():
+    spend = parse_quota(_payload(entitlement=5000, remaining=4846, token_based_billing=True))
+
+    assert spend.token_based_billing is True
+    assert spend.consumed == 154
+    assert spend.billable_prus == 0
+    assert spend.free_remaining_prus == 4846
+    assert spend.dollars_entitlement == 50.00
+    assert spend.dollars_free_remaining == 48.46
+
+
+def test_token_based_billing_overage_count_counts_as_billable_usage():
+    spend = parse_quota(
+        _payload(
+            entitlement=5000,
+            remaining=0,
+            token_based_billing=True,
+            snapshot_fields={"overage_count": 42, "overage_permitted": True},
+        )
+    )
+
+    assert spend.overage_permitted is True
+    assert spend.overage_count == 42
+    assert spend.consumed == 5042
+    assert spend.billable_prus == 42
+    assert spend.free_remaining_prus == 0
+    assert spend.dollars_owed == 0.42
+
+
+def test_token_based_billing_unlimited_snapshot_has_no_legacy_budget():
+    spend = parse_quota(
+        _payload(
+            entitlement=0,
+            remaining=0,
+            token_based_billing=True,
+            snapshot_fields={"unlimited": True, "has_quota": True, "overage_permitted": True},
+        )
+    )
+
+    assert spend.unlimited is True
+    assert spend.has_quota is True
+    assert spend.overage_permitted is True
+    assert spend.consumed == 0
+    assert spend.billable_prus == 0
+    assert spend.free_remaining_prus == 0
+    assert spend.dollars_entitlement == 0.00
+
+
+def test_token_based_billing_unlimited_negative_entitlement_clamps_budget_dollars():
+    spend = parse_quota(
+        _payload(
+            entitlement=-1,
+            remaining=0,
+            token_based_billing=True,
+            snapshot_fields={"has_quota": True, "overage_permitted": True},
+        )
+    )
+
+    assert spend.unlimited is True
+    assert spend.entitlement == -1
+    assert spend.dollars_entitlement == 0.00
+
+
+def test_token_based_billing_negative_remaining_fallback_includes_overage_count():
+    spend = parse_quota(
+        _payload(
+            entitlement=5000,
+            remaining=-100,
+            token_based_billing=True,
+            snapshot_fields={"overage_count": 42, "overage_permitted": True},
+        )
+    )
+
+    assert spend.consumed == 142
+    assert spend.billable_prus == 42
+    assert spend.free_remaining_prus == 4858
+    assert spend.dollars_owed == 0.42
 
 
 def test_reset_parses_iso8601_with_z_suffix():
@@ -238,3 +325,7 @@ def test_missing_login_becomes_empty_string():
 
 def test_pru_price_constant_is_4_cents():
     assert PRU_PRICE_USD == 0.04
+
+
+def test_ai_credit_price_constant_is_1_cent():
+    assert AI_CREDIT_PRICE_USD == 0.01

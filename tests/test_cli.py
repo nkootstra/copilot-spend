@@ -101,6 +101,27 @@ def test_whoami_prints_login_host_source_and_plan(monkeypatch, capsys):
     assert "plan:" in out and "business" in out
 
 
+def test_whoami_prints_token_based_billing_mode(monkeypatch, capsys):
+    auth = Auth(token="t", host="github.com", source="native")
+    monkeypatch.setattr(cli_module, "resolve_auth", lambda: auth)
+    monkeypatch.setattr(
+        cli_module,
+        "fetch_quota",
+        lambda a: {
+            "login": "alice",
+            "copilot_plan": "business",
+            "token_based_billing": True,
+        },
+    )
+
+    rc = cli_module.main(["whoami"])
+
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "billing:" in out
+    assert "token-based" in out
+
+
 def test_whoami_prints_identity_even_without_subscription(monkeypatch, capsys):
     auth = Auth(token="t", host="ghe.example.com", source="opencode")
     monkeypatch.setattr(cli_module, "resolve_auth", lambda: auth)

@@ -10,6 +10,9 @@ from typing import Any
 # Update this constant if GitHub changes the rate.
 PRU_PRICE_USD = 0.04
 
+# Published GitHub Copilot AI credit price as of 2026-06.
+AI_CREDIT_PRICE_USD = 0.01
+
 # Plausible field names for the next-reset timestamp. Searched at the payload
 # top level first, then inside `quota_snapshots.premium_interactions`. The
 # endpoint is undocumented; live observation (2026-05) shows `quota_reset_date`
@@ -41,14 +44,19 @@ class NoSubscriptionError(Exception):
 class Spend:
     login: str
     plan: str
-    entitlement: int  # included free PRUs per period
-    consumed: int  # total PRUs used this period (>= 0)
+    entitlement: int  # included free units per period
+    consumed: int  # total units used this period (>= 0)
     billable_prus: int  # max(0, consumed - entitlement)
     free_remaining_prus: int  # max(0, entitlement - consumed)
-    dollars_owed: float  # billable_prus * PRU_PRICE_USD
-    dollars_entitlement: float  # entitlement * PRU_PRICE_USD (reference)
-    dollars_free_remaining: float  # free_remaining_prus * PRU_PRICE_USD
+    dollars_owed: float
+    dollars_entitlement: float
+    dollars_free_remaining: float
     reset: datetime | None
+    token_based_billing: bool = False
+    unlimited: bool = False
+    has_quota: bool = True
+    overage_permitted: bool = False
+    overage_count: int = 0
 
 
 def _parse_iso(value: Any) -> datetime | None:
@@ -63,6 +71,14 @@ def _parse_iso(value: Any) -> datetime | None:
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=timezone.utc)
     return parsed
+
+
+def _parse_nonnegative_int(value: Any, *, default: int = 0) -> int:
+    try:
+        parsed = int(float(value))
+    except (TypeError, ValueError):
+        return default
+    return max(0, parsed)
 
 
 def _extract_reset(payload: dict[str, Any], pi: dict[str, Any]) -> datetime | None:
@@ -115,19 +131,32 @@ def parse_quota(payload: dict[str, Any]) -> Spend:
             f"premium_interactions missing entitlement/remaining: {exc}"
         ) from None
 
-    # API semantics observed against a business-plan account:
-    #   `remaining` counts down from 0 as you consume PRUs (so the value is
-    #   ≤ 0 in steady state on this plan class). `entitlement` is the free
-    #   credit per period — the first N PRUs are not billable.
-    # Defensive: if `remaining` is positive (unobserved case, possibly other
-    # plan classes), treat it as zero consumption rather than guessing.
-    consumed = max(0, -remaining)
-    billable_prus = max(0, consumed - entitlement)
-    free_remaining_prus = max(0, entitlement - consumed)
+    token_based_billing = payload.get("token_based_billing") is True
+    unlimited = pi.get("unlimited") is True or entitlement < 0
+    has_quota = pi.get("has_quota")
+    if not isinstance(has_quota, bool):
+        has_quota = True
+    overage_permitted = pi.get("overage_permitted") is True
+    overage_count = _parse_nonnegative_int(pi.get("overage_count"))
 
-    dollars_owed = round(billable_prus * PRU_PRICE_USD, 2)
-    dollars_entitlement = round(entitlement * PRU_PRICE_USD, 2)
-    dollars_free_remaining = round(free_remaining_prus * PRU_PRICE_USD, 2)
+    # Legacy responses observed `remaining <= 0`, where consumption was
+    # represented by the negative remainder. Token-based billing responses now
+    # expose a positive countdown from entitlement instead.
+    if unlimited:
+        consumed = overage_count
+    elif token_based_billing and remaining >= 0:
+        consumed = max(0, entitlement - remaining) + overage_count
+    elif token_based_billing:
+        consumed = max(0, -remaining) + overage_count
+    else:
+        consumed = max(0, -remaining)
+    billable_prus = 0 if unlimited else max(0, consumed - entitlement, overage_count)
+    free_remaining_prus = 0 if unlimited else max(0, entitlement - consumed)
+
+    unit_price = AI_CREDIT_PRICE_USD if token_based_billing else PRU_PRICE_USD
+    dollars_owed = round(billable_prus * unit_price, 2)
+    dollars_entitlement = round(max(0, entitlement) * unit_price, 2)
+    dollars_free_remaining = round(free_remaining_prus * unit_price, 2)
 
     reset = _extract_reset(payload, pi)
 
@@ -148,10 +177,16 @@ def parse_quota(payload: dict[str, Any]) -> Spend:
         dollars_entitlement=dollars_entitlement,
         dollars_free_remaining=dollars_free_remaining,
         reset=reset,
+        token_based_billing=token_based_billing,
+        unlimited=unlimited,
+        has_quota=has_quota,
+        overage_permitted=overage_permitted,
+        overage_count=overage_count,
     )
 
 
 __all__ = [
+    "AI_CREDIT_PRICE_USD",
     "PRU_PRICE_USD",
     "RESET_FIELD_CANDIDATES",
     "RESET_NESTED_PATHS",

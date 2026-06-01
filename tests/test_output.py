@@ -4,7 +4,7 @@ import json
 from datetime import datetime, timedelta, timezone
 
 from copilot_spend.output import render, render_json
-from copilot_spend.quota import PRU_PRICE_USD, Spend
+from copilot_spend.quota import AI_CREDIT_PRICE_USD, PRU_PRICE_USD, Spend
 
 
 def _spend(
@@ -14,9 +14,14 @@ def _spend(
     reset=None,
     login: str = "test-user",
     plan: str = "business",
+    token_based_billing: bool = False,
+    unlimited: bool = False,
+    overage_permitted: bool = False,
+    overage_count: int = 0,
 ) -> Spend:
-    billable = max(0, consumed - entitlement)
-    free_left = max(0, entitlement - consumed)
+    billable = 0 if unlimited else max(0, consumed - entitlement)
+    free_left = 0 if unlimited else max(0, entitlement - consumed)
+    unit_price = AI_CREDIT_PRICE_USD if token_based_billing else PRU_PRICE_USD
     return Spend(
         login=login,
         plan=plan,
@@ -24,10 +29,14 @@ def _spend(
         consumed=consumed,
         billable_prus=billable,
         free_remaining_prus=free_left,
-        dollars_owed=round(billable * PRU_PRICE_USD, 2),
-        dollars_entitlement=round(entitlement * PRU_PRICE_USD, 2),
-        dollars_free_remaining=round(free_left * PRU_PRICE_USD, 2),
+        dollars_owed=round(billable * unit_price, 2),
+        dollars_entitlement=round(max(0, entitlement) * unit_price, 2),
+        dollars_free_remaining=round(free_left * unit_price, 2),
         reset=reset,
+        token_based_billing=token_based_billing,
+        unlimited=unlimited,
+        overage_permitted=overage_permitted,
+        overage_count=overage_count,
     )
 
 
@@ -58,6 +67,64 @@ def test_output_contains_required_fields_over_cap():
     assert "$150.92" in out
     assert "3773 PRUs over allowance" in out
     assert "Jun 01, 2026" in out
+
+
+def test_token_based_billing_output_uses_ai_credit_price_without_pru_label():
+    reset = datetime(2026, 7, 1, tzinfo=timezone.utc)
+    out = render(
+        _spend(consumed=154, entitlement=5000, reset=reset, token_based_billing=True),
+        now=NOW,
+    )
+
+    assert "Billing:   token-based" in out
+    assert "154 AI credits" in out
+    assert "Budget:    $50.00  (5000 AI credits)" in out
+    assert "Remaining: $48.46  (4846 AI credits left)" in out
+    assert "AI-credit monthly spend is not available" not in out
+    assert "PRUs" not in out
+
+
+def test_token_based_billing_overage_output_shows_overage_permitted():
+    reset = datetime(2026, 7, 1, tzinfo=timezone.utc)
+    out = render(
+        _spend(
+            consumed=5042,
+            entitlement=5000,
+            reset=reset,
+            token_based_billing=True,
+            overage_permitted=True,
+            overage_count=42,
+        ),
+        now=NOW,
+    )
+
+    assert "Billing:   token-based" in out
+    assert "Used:      5042 AI credits" in out
+    assert "Budget:    $50.00  (5000 AI credits)" in out
+    assert "Billable:  $0.42  (42 AI credits over budget; overage enabled)" in out
+    assert "PRUs" not in out
+
+
+def test_token_based_billing_unlimited_output_has_no_zero_dollar_budget():
+    reset = datetime(2026, 7, 1, tzinfo=timezone.utc)
+    out = render(
+        _spend(
+            consumed=0,
+            entitlement=0,
+            reset=reset,
+            token_based_billing=True,
+            unlimited=True,
+            overage_permitted=True,
+        ),
+        now=NOW,
+    )
+
+    assert "Billing:   token-based" in out
+    assert "Used:      0 AI credits" in out
+    assert "Budget:    unlimited" in out
+    assert "Remaining: unlimited" in out
+    assert "$0.00" not in out
+    assert "PRUs" not in out
 
 
 def test_overage_renders_billable_line_not_remaining_line():
@@ -169,6 +236,49 @@ def test_render_json_includes_all_documented_fields():
     assert parsed["dollars_free_remaining"] == 0.00
     assert parsed["pru_price_usd"] == PRU_PRICE_USD
     assert parsed["reset"] == "2026-05-31T00:00:00+00:00"
+
+
+def test_render_json_token_based_billing_marks_ai_credit_bucket():
+    parsed = json.loads(
+        render_json(_spend(consumed=154, entitlement=5000, token_based_billing=True))
+    )
+
+    assert parsed["billing_model"] == "token_based"
+    assert parsed["token_based_billing"] is True
+    assert parsed["legacy_entitlement_premium_interactions"] == 5000
+    assert parsed["legacy_consumed_premium_interactions"] == 154
+    assert parsed["legacy_remaining_premium_interactions"] == 4846
+    assert parsed["ai_credit_monthly_spend_available"] is False
+    assert parsed["legacy_overage_permitted"] is False
+    assert parsed["legacy_overage_premium_interactions"] == 0
+    assert parsed["legacy_unlimited"] is False
+    assert parsed["ai_credit_price_usd"] == AI_CREDIT_PRICE_USD
+    assert parsed["included_ai_credits"] == 5000
+    assert parsed["used_ai_credits"] == 154
+    assert parsed["remaining_ai_credits"] == 4846
+    assert parsed["billable_ai_credits"] == 0
+    assert parsed["dollars_entitlement"] == 50.00
+    assert parsed["dollars_free_remaining"] == 48.46
+    assert parsed["dollars_owed"] == 0.00
+    assert parsed["pru_price_usd"] is None
+
+
+def test_render_json_token_based_unlimited_clamps_included_ai_credits():
+    parsed = json.loads(
+        render_json(
+            _spend(
+                consumed=0,
+                entitlement=-1,
+                token_based_billing=True,
+                unlimited=True,
+            )
+        )
+    )
+
+    assert parsed["legacy_unlimited"] is True
+    assert parsed["legacy_entitlement_premium_interactions"] == -1
+    assert parsed["included_ai_credits"] == 0
+    assert parsed["remaining_ai_credits"] is None
 
 
 def test_render_json_reset_none_serializes_as_null():
