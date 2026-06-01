@@ -76,6 +76,8 @@ def _run_show_quota(*, as_json: bool = False) -> int:
 
     try:
         if as_json:
+            # The CLI intentionally writes user-requested account usage details to stdout.
+            # codeql[py/clear-text-logging-sensitive-data]
             print(render_json(spend))
         else:
             print(render(spend, now=datetime.now(timezone.utc)))
@@ -98,6 +100,7 @@ def _run_whoami() -> int:
 
     login = ""
     plan = ""
+    billing = ""
     try:
         payload = fetch_quota(auth)
     except NoSubscriptionError:
@@ -110,6 +113,10 @@ def _run_whoami() -> int:
     if isinstance(payload, dict):
         login = str(payload.get("login") or "")
         plan = str(payload.get("copilot_plan") or "")
+        if payload.get("token_based_billing") is True:
+            billing = "token-based"
+        elif payload.get("token_based_billing") is False:
+            billing = "premium-requests"
 
     lines = [
         f"host:   {auth.host}",
@@ -121,7 +128,11 @@ def _run_whoami() -> int:
         lines.append(f"plan:   {plan}")
     elif payload is None:
         lines.append("plan:   (no Copilot quota on this account)")
+    if billing:
+        lines.append(f"billing: {billing}")
 
+    # The CLI intentionally writes user-requested account identity details to stdout.
+    # codeql[py/clear-text-logging-sensitive-data]
     print("\n".join(lines))
     return 0
 

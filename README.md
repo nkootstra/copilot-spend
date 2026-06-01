@@ -3,7 +3,7 @@
 Find out what your Copilot habit actually costs.
 
 A small Python CLI that reads your GitHub Copilot quota and prints
-your current-period spend in dollars and PRUs, plus when the period resets.
+your current-period billing mode, quota bucket, and reset date.
 Works against both `github.com` and GitHub Enterprise hosts.
 
 ## How it works
@@ -54,11 +54,10 @@ The bare `copilot-spend` invocation, expanded as numbered steps:
 3. Calls `GET /api/v3/copilot_internal/user` on your GHE host, or
    `GET https://api.github.com/copilot_internal/user` if no enterprise
    host is configured.
-4. Computes the billable overage:
-   `billable_PRUs = max(0, consumed - entitlement)`, then
-   `dollars_owed = billable_PRUs × $0.04`.
-   The first `entitlement` PRUs each period are included with your plan
-   and cost nothing.
+4. Reads the billing mode. For legacy premium-request billing,
+   computes the billable PRU overage. For token-based billing, reports
+   the `premium_interactions` quota bucket as AI credits at $0.01 per
+   credit.
 5. Prints a plain-text summary on stdout.
 
 No background daemon. No history. No session-token cache. One HTTP
@@ -107,7 +106,7 @@ uvx --from . copilot-spend
 ```sh
 copilot-spend          # print current-period quota
 copilot-spend --json   # same data as JSON (stable schema, jq-friendly)
-copilot-spend whoami   # print active login, host, source, and plan
+copilot-spend whoami   # print active login, host, source, plan, and billing mode
 copilot-spend login    # authenticate via GitHub OAuth device flow
 copilot-spend logout   # remove copilot-spend's stored credentials
 ```
@@ -130,6 +129,29 @@ GitHub Copilot - your-login (business)
   Resets:    May 31, 2026 (in 15 days)
 ```
 
+Example output (token-based billing):
+
+```
+GitHub Copilot - your-login (business)
+  Billing:   token-based
+  Used:      154 AI credits
+  Budget:    $50.00  (5000 AI credits)
+  Remaining: $48.46  (4846 AI credits left)
+  Resets:    Jul 01, 2026 (in 30 days)
+```
+
+Example output (token-based billing with unlimited legacy quota):
+
+```
+GitHub Copilot - your-login (enterprise)
+  Billing:   token-based
+  Used:      0 AI credits
+  Budget:    unlimited
+  Remaining: unlimited
+  Overage:   enabled
+  Resets:    Jul 01, 2026 (in 30 days)
+```
+
 Example output (over your allowance — billable overage):
 
 ```
@@ -146,17 +168,32 @@ JSON output (stable schema, `null` fields included):
 
 ```json
 {
+  "ai_credit_monthly_spend_available": null,
+  "ai_credit_price_usd": null,
+  "billable_ai_credits": null,
   "billable_prus": 3773,
+  "billing_model": "premium_requests",
   "consumed_prus": 4073,
   "dollars_entitlement": 12.0,
   "dollars_free_remaining": 0.0,
   "dollars_owed": 150.92,
   "entitlement_prus": 300,
   "free_remaining_prus": 0,
+  "included_ai_credits": null,
+  "legacy_consumed_premium_interactions": null,
+  "legacy_entitlement_premium_interactions": null,
+  "legacy_has_quota": null,
+  "legacy_overage_permitted": null,
+  "legacy_overage_premium_interactions": null,
+  "legacy_remaining_premium_interactions": null,
+  "legacy_unlimited": null,
   "login": "your-login",
   "plan": "business",
   "pru_price_usd": 0.04,
-  "reset": "2026-06-01T00:00:00+00:00"
+  "remaining_ai_credits": null,
+  "reset": "2026-06-01T00:00:00+00:00",
+  "token_based_billing": false,
+  "used_ai_credits": null
 }
 ```
 
@@ -213,12 +250,28 @@ copilot-spend install no longer breaks if Microsoft rotates
 
 ## Caveats
 
-- The PRU price is hardcoded at $0.04 (correct as of 2026-05). Update the
-  constant in `src/copilot_spend/quota.py` if GitHub changes it.
+- On token-based Copilot billing, GitHub still returns a legacy
+  `premium_interactions` quota bucket from `/copilot_internal/user`.
+  `copilot-spend` reports that bucket as AI credits and prices it at
+  $0.01 per credit.
+- GitHub's published token-based model bills additional usage in AI
+  credits at per-token model rates. One AI credit is $0.01 USD; code
+  completions and next edit suggestions are included and do not consume
+  AI credits.
+- Detailed monthly AI-credit usage breakdown is not available from
+  `/copilot_internal/user`.
+  GitHub's public enhanced-billing APIs may expose that data for some
+  `github.com` org/user/enterprise scopes, but GitHub Enterprise hosts
+  can return `404` for those endpoints. This CLI currently uses the
+  internal endpoint so it continues to work against GHE.
+- For legacy premium-request billing, the PRU price is hardcoded at
+  $0.04 (correct as of 2026-05). Update the constant in
+  `src/copilot_spend/quota.py` if GitHub changes it.
 - v1 ships with VS Code's GitHub App ID `Iv1.b507a08c87ecfe98` for the
   device flow. See "Switch to your own GitHub App" above to remove the
-  dependency.
-- The billing model assumed: the first `entitlement` PRUs each period are
+  dependency. The archived `microsoft/vscode-copilot-chat` repository has
+  moved into `microsoft/vscode` under `extensions/copilot`.
+- The legacy billing model assumed: the first `entitlement` PRUs each period are
   included with your plan, and anything beyond that is billable at $0.04
   per PRU. This matches observed behavior on a business plan. Org-level
   caps or contracts may change what you actually pay — treat the

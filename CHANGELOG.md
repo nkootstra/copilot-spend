@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Token-based Copilot billing detection from `/copilot_internal/user`.
+  Text output now labels token-based accounts and reports the
+  premium-interactions bucket as AI credits at $0.01 per credit.
+- JSON output now includes additive token-billing fields:
+  `billing_model`, `token_based_billing`, `ai_credit_price_usd`, and
+  AI-credit bucket aliases for token-based responses.
+- `copilot-spend whoami` now prints the billing mode when GitHub returns it.
+- Token-based output now handles legacy unlimited quota snapshots and
+  overage-enabled users without rendering a misleading zero-dollar budget.
+
+### Changed
+
+- Positive `premium_interactions.remaining` values now count down from
+  `entitlement` when `token_based_billing` is true. Legacy non-token
+  responses keep the old negative-remaining interpretation.
+
 ## [0.2.0] - 2026-05-17
 
 ### Added
