@@ -219,3 +219,14 @@ __marimo__/
 
 # Project-internal planning docs (brainstorms, plans) — never ship to PyPI or git
 docs/
+
+# --- Node / TypeScript (typescript/ package) ---
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+.npmrc
+
+# Bun keeps a text lockfile (bun.lock) which IS committed; the older binary
+# lockfile is not.
+bun.lockb

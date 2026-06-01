@@ -42,8 +42,8 @@ dev = [
 Homepage = "https://github.com/nkootstra/copilot-spend"
 Source = "https://github.com/nkootstra/copilot-spend"
 Issues = "https://github.com/nkootstra/copilot-spend/issues"
-Changelog = "https://github.com/nkootstra/copilot-spend/blob/main/CHANGELOG.md"
-Documentation = "https://github.com/nkootstra/copilot-spend#readme"
+Changelog = "https://github.com/nkootstra/copilot-spend/blob/main/python/CHANGELOG.md"
+Documentation = "https://github.com/nkootstra/copilot-spend/tree/main/python#readme"
 
 [project.scripts]
 copilot-spend = "copilot_spend.cli:_entrypoint"
