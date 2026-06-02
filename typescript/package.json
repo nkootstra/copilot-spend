@@ -31,7 +31,7 @@
     "url": "https://github.com/nkootstra/copilot-spend/issues"
   },
   "devDependencies": {
-    "@biomejs/biome": "^1.9.4",
+    "@biomejs/biome": "^2.4.16",
     "@types/bun": "latest",
     "typescript": "^6.0.3"
   }
