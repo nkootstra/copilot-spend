@@ -110,7 +110,7 @@ export function render(spend: Spend, now: Date): string {
 
   if (spend.billablePrus > 0) {
     lines.push(
-      `  Billable:  ${formatDollars(spend.dollarsOwed)}  (${spend.billablePrus} PRUs over allowance at $0.04/PRU)`,
+      `  Billable:  ${formatDollars(spend.dollarsOwed)}  (${spend.billablePrus} PRUs over allowance at ${formatDollars(PRU_PRICE_USD)}/PRU)`,
     );
   } else {
     lines.push(

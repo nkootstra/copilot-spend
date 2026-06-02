@@ -77,6 +77,7 @@ describe("render — PRU mode", () => {
     expect(out).toContain("4073 PRUs");
     expect(out).toContain("$150.92");
     expect(out).toContain("3773 PRUs over allowance");
+    expect(out).toContain(`at $${PRU_PRICE_USD.toFixed(2)}/PRU`);
     expect(out).toContain("Jun 01, 2026");
   });
 
