@@ -5,20 +5,20 @@ import { Readable } from "node:stream";
 import { AuthError } from "../src/auth";
 import { APIError, NoSubscriptionError } from "../src/errors";
 import {
+  createStdinReader,
+  defaultPostJson,
+  interruptibleSleep,
   LoginCancelledError,
   LoginHttpError,
   LoginNetworkError,
   LoginTimeoutError,
   type PostJson,
   type RunLoginOptions,
-  createStdinReader,
-  defaultPostJson,
-  interruptibleSleep,
   runLogin,
   runLogout,
 } from "../src/login";
 import { authPath, configDir, writeSecretFile } from "../src/paths";
-import { isPosix, isolateEnv, makeTmpDir, removeTmpDir } from "./helpers";
+import { isolateEnv, isPosix, makeTmpDir, removeTmpDir } from "./helpers";
 
 let tmp: string;
 let restoreEnv: () => void;

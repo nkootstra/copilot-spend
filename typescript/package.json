@@ -6,7 +6,12 @@
   "bin": {
     "copilot-spend": "./dist/cli.js"
   },
-  "files": ["dist", "README.md", "LICENSE", "CHANGELOG.md"],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
   "engines": {
     "node": ">=22"
   },
@@ -18,7 +23,13 @@
     "format": "biome format --write .",
     "prepublishOnly": "bun run build"
   },
-  "keywords": ["github", "copilot", "spend", "quota", "cli"],
+  "keywords": [
+    "github",
+    "copilot",
+    "spend",
+    "quota",
+    "cli"
+  ],
   "author": "Niels Kootstra <niels.kootstra@gmail.com>",
   "license": "MIT",
   "homepage": "https://github.com/nkootstra/copilot-spend/tree/main/typescript#readme",
@@ -31,7 +42,7 @@
     "url": "https://github.com/nkootstra/copilot-spend/issues"
   },
   "devDependencies": {
-    "@biomejs/biome": "^1.9.4",
+    "@biomejs/biome": "^2.4.16",
     "@types/bun": "latest",
     "typescript": "^6.0.3"
   }
