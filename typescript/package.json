@@ -1,0 +1,38 @@
+{
+  "name": "copilot-spend",
+  "version": "0.3.0",
+  "description": "Print your current-period GitHub Copilot spend and reset date.",
+  "type": "module",
+  "bin": {
+    "copilot-spend": "./dist/cli.js"
+  },
+  "files": ["dist", "README.md", "LICENSE", "CHANGELOG.md"],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "bun build ./src/bin.ts --target node --outfile ./dist/cli.js --banner '#!/usr/bin/env node' && chmod +x ./dist/cli.js",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "format": "biome format --write .",
+    "prepublishOnly": "bun run build"
+  },
+  "keywords": ["github", "copilot", "spend", "quota", "cli"],
+  "author": "Niels Kootstra <niels.kootstra@gmail.com>",
+  "license": "MIT",
+  "homepage": "https://github.com/nkootstra/copilot-spend/tree/main/typescript#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nkootstra/copilot-spend.git",
+    "directory": "typescript"
+  },
+  "bugs": {
+    "url": "https://github.com/nkootstra/copilot-spend/issues"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "@types/bun": "latest",
+    "typescript": "^5.6.0"
+  }
+}
