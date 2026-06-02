@@ -31,13 +31,13 @@ export interface CliDeps {
 
 function withDefaults(deps: Partial<CliDeps>): CliDeps {
   return {
-    resolveAuth: deps.resolveAuth ?? (() => resolveAuth()),
-    fetchQuota: deps.fetchQuota ?? ((auth) => fetchQuota(auth)),
+    resolveAuth: deps.resolveAuth ?? resolveAuth,
+    fetchQuota: deps.fetchQuota ?? fetchQuota,
     parseQuota: deps.parseQuota ?? parseQuota,
     render: deps.render ?? render,
     renderJson: deps.renderJson ?? renderJson,
-    runLogin: deps.runLogin ?? (() => runLogin()),
-    runLogout: deps.runLogout ?? (() => runLogout()),
+    runLogin: deps.runLogin ?? runLogin,
+    runLogout: deps.runLogout ?? runLogout,
     now: deps.now ?? (() => new Date()),
     stdout: deps.stdout ?? ((text) => void process.stdout.write(text)),
     stderr: deps.stderr ?? ((text) => void process.stderr.write(text)),
