@@ -10,7 +10,7 @@ This is the TypeScript/Node build, published to npm. It is a faithful
 port of the [Python package](https://github.com/nkootstra/copilot-spend/tree/main/python)
 with identical behavior — same auth sources, same output, same exit
 codes, same JSON schema. Built with [Bun](https://bun.sh); the published
-artifact is a single bundled file that runs on Node 18+.
+artifact is a single bundled file that runs on Node 22+.
 
 ## How it works
 
@@ -71,7 +71,7 @@ request per run.
 
 ## Requirements
 
-- Node.js 18 or newer (the global `fetch` and `BigInt` it relies on are
+- Node.js 22 or newer (the global `fetch` and `BigInt` it relies on are
   built in), or Bun
 - macOS or Linux
 - A GitHub Copilot token, obtained by either:

@@ -17,7 +17,7 @@ version tags within this monorepo.
 
 Initial npm release: a faithful TypeScript port of the Python package at
 full feature parity. Built with Bun; the published artifact is a single
-bundled file that runs on Node 18+ with zero runtime dependencies.
+bundled file that runs on Node 22+ with zero runtime dependencies.
 
 ### Added
 

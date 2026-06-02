@@ -8,7 +8,7 @@
   },
   "files": ["dist", "README.md", "LICENSE", "CHANGELOG.md"],
   "engines": {
-    "node": ">=18"
+    "node": ">=22"
   },
   "scripts": {
     "build": "bun build ./src/bin.ts --target node --outfile ./dist/cli.js --banner '#!/usr/bin/env node' && chmod +x ./dist/cli.js",

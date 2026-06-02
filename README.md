@@ -13,7 +13,7 @@ codes, same stable JSON schema. Pick whichever fits your toolchain:
 | Package | Language | Registry | Install | Docs |
 |---------|----------|----------|---------|------|
 | [`python/`](python/) | Python 3.10+ | [PyPI](https://pypi.org/project/copilot-spend/) | `pipx install copilot-spend` | [python/README.md](python/README.md) |
-| [`typescript/`](typescript/) | TypeScript (Bun build, runs on Node 18+) | [npm](https://www.npmjs.com/package/copilot-spend) | `npm install -g copilot-spend` | [typescript/README.md](typescript/README.md) |
+| [`typescript/`](typescript/) | TypeScript (Bun build, runs on Node 22+) | [npm](https://www.npmjs.com/package/copilot-spend) | `npm install -g copilot-spend` | [typescript/README.md](typescript/README.md) |
 
 Both publish the same `copilot-spend` command name, so:
 
