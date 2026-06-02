@@ -5,7 +5,7 @@ import { APIError, AuthError, NoSubscriptionError } from "./errors";
 import { runLogin, runLogout } from "./login";
 import { render, renderJson } from "./output";
 import { scrub } from "./paths";
-import { type Spend, parseQuota } from "./quota";
+import { parseQuota, type Spend } from "./quota";
 import { packageVersion } from "./version";
 
 type Writer = (text: string) => void;

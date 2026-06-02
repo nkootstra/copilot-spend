@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { Auth, AuthError, isValidHost, normalizeHost, resolveAuth } from "../src/auth";
-import { isPosix, isolateEnv, makeTmpDir, removeTmpDir } from "./helpers";
+import { isolateEnv, isPosix, makeTmpDir, removeTmpDir } from "./helpers";
 
 let tmp: string;
 let restoreEnv: () => void;
@@ -324,12 +324,14 @@ describe("isValidHost — SSRF host validation", () => {
     expect(isValidHost(ip)).toBe(false);
   });
 
-  test.each(["github.com", "ghe.example.com", "api.github.com", "internal.ghe.example"])(
-    "accepts ordinary hostname %s",
-    (host) => {
-      expect(isValidHost(host)).toBe(true);
-    },
-  );
+  test.each([
+    "github.com",
+    "ghe.example.com",
+    "api.github.com",
+    "internal.ghe.example",
+  ])("accepts ordinary hostname %s", (host) => {
+    expect(isValidHost(host)).toBe(true);
+  });
 });
 
 describe("normalizeHost", () => {

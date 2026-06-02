@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { chmodSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { AuthError } from "../src/errors";
@@ -11,7 +11,7 @@ import {
   scrub,
   writeSecretFile,
 } from "../src/paths";
-import { isPosix, isolateEnv, makeTmpDir, removeTmpDir } from "./helpers";
+import { isolateEnv, isPosix, makeTmpDir, removeTmpDir } from "./helpers";
 
 const ENV_KEYS = ["COPILOT_SPEND_CONFIG_DIR", "XDG_CONFIG_HOME"];
 
