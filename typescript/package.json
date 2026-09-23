@@ -1,6 +1,6 @@
 {
   "name": "copilot-spend",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Print your current-period GitHub Copilot spend and reset date.",
   "type": "module",
   "bin": {

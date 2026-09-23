@@ -13,6 +13,15 @@ version tags within this monorepo.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-23
+
+Version bump to keep parity with Python `0.4.0`. No functional changes to
+the CLI; the published bundle is unchanged in behavior.
+
+### Changed
+
+- Type-checked with TypeScript 7 (native compiler) and linted with Biome 2.
+
 ## [0.3.0] - 2026-06-01
 
 Initial npm release: a faithful TypeScript port of the Python package at
@@ -59,5 +68,6 @@ bundled file that runs on Node 22+ with zero runtime dependencies.
 - Documented exit codes (`0` success, `1` unexpected, `2` auth, `3` API,
   `4` no Copilot quota) — identical to the Python build.
 
-[Unreleased]: https://github.com/nkootstra/copilot-spend/compare/npm-v0.3.0...HEAD
+[Unreleased]: https://github.com/nkootstra/copilot-spend/compare/npm-v0.4.0...HEAD
+[0.4.0]: https://github.com/nkootstra/copilot-spend/releases/tag/npm-v0.4.0
 [0.3.0]: https://github.com/nkootstra/copilot-spend/releases/tag/npm-v0.3.0

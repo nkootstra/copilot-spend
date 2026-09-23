@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-23
+
+### Changed
+
+- The Python package now lives in the `python/` directory of the
+  copilot-spend monorepo, alongside the new TypeScript/npm build. The
+  PyPI `Changelog` and `Documentation` project URLs point at the new
+  locations. No functional changes to the CLI.
+
 ## [0.3.0] - 2026-06-01
 
 ### Added
@@ -94,7 +103,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Mermaid flowchart in the README covering the full login, logout, and
   bare-invocation flows.
 
-[Unreleased]: https://github.com/nkootstra/copilot-spend/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/nkootstra/copilot-spend/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/nkootstra/copilot-spend/releases/tag/v0.4.0
 [0.3.0]: https://github.com/nkootstra/copilot-spend/releases/tag/v0.3.0
 [0.2.0]: https://github.com/nkootstra/copilot-spend/releases/tag/v0.2.0
 [0.1.0]: https://github.com/nkootstra/copilot-spend/releases/tag/v0.1.0
